@@ -1,5 +1,5 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Files.App.Dialogs;
 using Files.App.ViewModels.Properties;
@@ -79,6 +79,9 @@ namespace Files.App.Views.Properties
 
 		private void UpdateDateDisplayTimer_Tick(object sender, object e)
 		{
+			if (App.AppModel.PropertiesWindowCount == 0)
+				return;
+
 			ViewModel.PropertySections.ForEach(section => section.ForEach(property =>
 			{
 				if (property.Value is DateTimeOffset)

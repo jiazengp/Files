@@ -1,27 +1,27 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
-using Files.App.UserControls.MultitaskingControl;
+using Files.App.UserControls.TabBar;
 using System.Collections.Immutable;
 
 namespace Files.App.Data.Contexts
 {
-	internal class ContentPageContext : ObservableObject, IContentPageContext
+	internal sealed class ContentPageContext : ObservableObject, IContentPageContext
 	{
 		private static readonly IReadOnlyList<ListedItem> emptyItems = Enumerable.Empty<ListedItem>().ToImmutableList();
 
-		private readonly IPageContext context = Ioc.Default.GetRequiredService<IPageContext>();
+		private readonly IMultiPanesContext context = Ioc.Default.GetRequiredService<IMultiPanesContext>();
 
-		private ItemViewModel? filesystemViewModel;
+		private ShellViewModel? filesystemViewModel;
 
-		public IShellPage? ShellPage => context?.PaneOrColumn;
+		public IShellPage? ShellPage => context?.ActivePaneOrColumn;
 
-		public Type PageLayoutType => ShellPage?.CurrentPageType ?? typeof(DetailsLayoutBrowser);
+		public Type PageLayoutType => ShellPage?.CurrentPageType ?? typeof(DetailsLayoutPage);
 
 		private ContentPageTypes pageType = ContentPageTypes.None;
 		public ContentPageTypes PageType => pageType;
 
-		public ListedItem? Folder => ShellPage?.FilesystemViewModel?.CurrentFolder;
+		public ListedItem? Folder => ShellPage?.ShellViewModel?.CurrentFolder;
 
 		public bool HasItem => ShellPage?.ToolbarViewModel?.HasItem ?? false;
 
@@ -43,22 +43,20 @@ namespace Files.App.Data.Contexts
 
 		public bool CanCreateItem => GetCanCreateItem();
 
-		public bool IsMultiPaneEnabled => ShellPage is not null && ShellPage.PaneHolder is not null && ShellPage.PaneHolder.IsMultiPaneEnabled;
+		public bool IsMultiPaneAvailable => ShellPage is not null && ShellPage.PaneHolder is not null && ShellPage.PaneHolder.IsMultiPaneAvailable;
 
 		public bool IsMultiPaneActive => ShellPage is not null && ShellPage.PaneHolder is not null && ShellPage.PaneHolder.IsMultiPaneActive;
-
-		public bool ShowSearchUnindexedItemsMessage => ShellPage is not null && ShellPage.InstanceViewModel.ShowSearchUnindexedItemsMessage;
 
 		public bool IsGitRepository => ShellPage is not null && ShellPage.InstanceViewModel.IsGitRepository;
 
 		public bool CanExecuteGitAction => IsGitRepository && !GitHelpers.IsExecutingGitAction;
 
-		public string? SolutionFilePath => ShellPage?.FilesystemViewModel?.SolutionFilePath;
+		public string? SolutionFilePath => ShellPage?.ShellViewModel?.SolutionFilePath;
 
 		public ContentPageContext()
 		{
-			context.Changing += Context_Changing;
-			context.Changed += Context_Changed;
+			context.ActivePaneChanging += Context_Changing;
+			context.ActivePaneChanged += Context_Changed;
 			GitHelpers.IsExecutingGitActionChanged += GitHelpers_IsExecutingGitActionChanged;
 
 			Update();
@@ -101,12 +99,13 @@ namespace Files.App.Data.Contexts
 					page.PaneHolder.PropertyChanged += PaneHolder_PropertyChanged;
 			}
 
-			filesystemViewModel = ShellPage?.FilesystemViewModel;
+			filesystemViewModel = ShellPage?.ShellViewModel;
 			if (filesystemViewModel is not null)
 				filesystemViewModel.PropertyChanged += FilesystemViewModel_PropertyChanged;
 
 			Update();
 			OnPropertyChanged(nameof(ShellPage));
+			OnPropertyChanged(nameof(Folder));
 		}
 
 		private void Page_PropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -117,20 +116,20 @@ namespace Files.App.Data.Contexts
 					OnPropertyChanged(nameof(PageLayoutType));
 					break;
 				case nameof(ShellPage.PaneHolder):
-					OnPropertyChanged(nameof(IsMultiPaneEnabled));
+					OnPropertyChanged(nameof(IsMultiPaneAvailable));
 					OnPropertyChanged(nameof(IsMultiPaneActive));
 					break;
 			}
 		}
 
-		private void Page_ContentChanged(object? sender, TabItemArguments e) => Update();
+		private void Page_ContentChanged(object? sender, TabBarItemParameter e) => Update();
 
 		private void PaneHolder_PropertyChanged(object? sender, PropertyChangedEventArgs e)
 		{
 			switch (e.PropertyName)
 			{
-				case nameof(IPaneHolder.IsMultiPaneEnabled):
-				case nameof(IPaneHolder.IsMultiPaneActive):
+				case nameof(IShellPanesPage.IsMultiPaneAvailable):
+				case nameof(IShellPanesPage.IsMultiPaneActive):
 					OnPropertyChanged(e.PropertyName);
 					break;
 			}
@@ -150,9 +149,6 @@ namespace Files.App.Data.Contexts
 				case nameof(CurrentInstanceViewModel.IsPageTypeSearchResults):
 					UpdatePageType();
 					break;
-				case nameof(CurrentInstanceViewModel.ShowSearchUnindexedItemsMessage):
-					OnPropertyChanged(nameof(ShowSearchUnindexedItemsMessage));
-					break;
 				case nameof(CurrentInstanceViewModel.IsGitRepository):
 					OnPropertyChanged(nameof(IsGitRepository));
 					OnPropertyChanged(nameof(CanExecuteGitAction));
@@ -164,15 +160,15 @@ namespace Files.App.Data.Contexts
 		{
 			switch (e.PropertyName)
 			{
-				case nameof(ToolbarViewModel.CanGoBack):
-				case nameof(ToolbarViewModel.CanGoForward):
-				case nameof(ToolbarViewModel.CanNavigateToParent):
-				case nameof(ToolbarViewModel.HasItem):
-				case nameof(ToolbarViewModel.CanRefresh):
-				case nameof(ToolbarViewModel.IsSearchBoxVisible):
+				case nameof(AddressToolbarViewModel.CanGoBack):
+				case nameof(AddressToolbarViewModel.CanGoForward):
+				case nameof(AddressToolbarViewModel.CanNavigateToParent):
+				case nameof(AddressToolbarViewModel.HasItem):
+				case nameof(AddressToolbarViewModel.CanRefresh):
+				case nameof(AddressToolbarViewModel.IsSearchBoxVisible):
 					OnPropertyChanged(e.PropertyName);
 					break;
-				case nameof(ToolbarViewModel.SelectedItems):
+				case nameof(AddressToolbarViewModel.SelectedItems):
 					UpdateSelectedItems();
 					break;
 			}
@@ -182,10 +178,10 @@ namespace Files.App.Data.Contexts
 		{
 			switch (e.PropertyName)
 			{
-				case nameof(ItemViewModel.CurrentFolder):
+				case nameof(ShellViewModel.CurrentFolder):
 					OnPropertyChanged(nameof(Folder));
 					break;
-				case nameof(ItemViewModel.SolutionFilePath):
+				case nameof(ShellViewModel.SolutionFilePath):
 					OnPropertyChanged(nameof(SolutionFilePath));
 					break;
 			}
@@ -196,16 +192,14 @@ namespace Files.App.Data.Contexts
 			UpdatePageType();
 			UpdateSelectedItems();
 
-			OnPropertyChanged(nameof(Folder));
 			OnPropertyChanged(nameof(HasItem));
 			OnPropertyChanged(nameof(CanGoBack));
 			OnPropertyChanged(nameof(CanGoForward));
 			OnPropertyChanged(nameof(CanNavigateToParent));
 			OnPropertyChanged(nameof(CanRefresh));
 			OnPropertyChanged(nameof(CanCreateItem));
-			OnPropertyChanged(nameof(IsMultiPaneEnabled));
+			OnPropertyChanged(nameof(IsMultiPaneAvailable));
 			OnPropertyChanged(nameof(IsMultiPaneActive));
-			OnPropertyChanged(nameof(ShowSearchUnindexedItemsMessage));
 			OnPropertyChanged(nameof(IsGitRepository));
 			OnPropertyChanged(nameof(CanExecuteGitAction));
 		}

@@ -1,5 +1,5 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using System.IO;
 using System.Runtime.InteropServices.WindowsRuntime;
@@ -11,7 +11,7 @@ using IO = System.IO;
 
 namespace Files.App.Utils.Storage
 {
-	public class VirtualStorageFile : BaseStorageFile
+	public sealed class VirtualStorageFile : BaseStorageFile
 	{
 		public override string Path { get; }
 		public override string Name { get; }
@@ -46,7 +46,7 @@ namespace Files.App.Utils.Storage
 			Path = "";
 		}
 
-		private async void StreamedFileWriter(StreamedFileDataRequest request)
+		private async void StreamedFileWriterAsync(StreamedFileDataRequest request)
 		{
 			try
 			{
@@ -78,7 +78,7 @@ namespace Files.App.Utils.Storage
 
 		public override IAsyncOperation<StorageFile> ToStorageFileAsync()
 		{
-			return StorageFile.CreateStreamedFileAsync(Name, StreamedFileWriter, null);
+			return StorageFile.CreateStreamedFileAsync(Name, StreamedFileWriterAsync, null);
 		}
 
 		public override bool IsEqual(IStorageItem item) => item?.Path == Path;

@@ -1,38 +1,36 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Windows.ApplicationModel.DataTransfer;
 
 namespace Files.App.Actions
 {
-	internal class CopyPathAction : IAction
+	internal sealed class CopyPathAction : IAction
 	{
 		private readonly IContentPageContext context;
 
 		public string Label
-			=> "CopyPath".GetLocalizedResource();
+			=> Strings.CopyPath.GetLocalizedResource();
 
 		public string Description
-			=> "CopyPathDescription".GetLocalizedResource();
+			=> Strings.CopyPathDescription.GetLocalizedResource();
 
 		public RichGlyph Glyph
-			=> new RichGlyph(opacityStyle: "ColorIconCopyPath");
+			=> new RichGlyph(themedIconStyle: "App.ThemedIcons.CopyAsPath");
 
-		public HotKey HotKey
-			=> new(Keys.C, KeyModifiers.CtrlShift);
+		public bool IsExecutable
+			=> context.PageType != ContentPageTypes.Home && context.PageType != ContentPageTypes.RecycleBin;
 
 		public CopyPathAction()
 		{
 			context = Ioc.Default.GetRequiredService<IContentPageContext>();
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
 			if (context.ShellPage?.SlimContentPage is not null)
 			{
-				var path = context.ShellPage.SlimContentPage.SelectedItem is not null
-					? context.ShellPage.SlimContentPage.SelectedItem.ItemPath
-					: context.ShellPage.FilesystemViewModel.WorkingDirectory;
+				var path = context.ShellPage.ShellViewModel.WorkingDirectory;
 
 				if (FtpHelpers.IsFtpPath(path))
 					path = path.Replace("\\", "/", StringComparison.Ordinal);

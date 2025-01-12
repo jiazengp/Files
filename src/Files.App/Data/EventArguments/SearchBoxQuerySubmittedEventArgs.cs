@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Files.App.Data.Models;
 using Microsoft.UI.Xaml.Controls;
@@ -7,7 +7,7 @@ using Windows.Foundation;
 
 namespace Files.App.Data.EventArguments
 {
-	public class SearchBoxQuerySubmittedEventArgs
+	public sealed class SearchBoxQuerySubmittedEventArgs
 	{
 		public SuggestionModel ChosenSuggestion { get; }
 

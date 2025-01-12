@@ -1,5 +1,5 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using System.IO;
 using System.Runtime.InteropServices.WindowsRuntime;
@@ -48,7 +48,7 @@ namespace Files.App.Utils.Storage
 
 		public override IAsyncOperation<BaseBasicProperties> GetBasicPropertiesAsync()
 			=> AsyncInfo.Run<BaseBasicProperties>(async (cancellationToken)
-				=> new SystemFileBasicProperties(await File.GetBasicPropertiesAsync())
+				=> new SystemFileBasicProperties(await File.GetBasicPropertiesAsync(), DateCreated)
 			);
 
 		public override IAsyncOperation<BaseStorageFile> CopyAsync(IStorageFolder destinationFolder)
@@ -84,12 +84,12 @@ namespace Files.App.Utils.Storage
 						return destFile;
 					}
 				}
-				catch (UnauthorizedAccessException ex) // shortcuts & .url
+				catch (UnauthorizedAccessException) // shortcuts & .url
 				{
 					if (!string.IsNullOrEmpty(destFolder.Path))
 					{
 						var destination = IO.Path.Combine(destFolder.Path, desiredNewName);
-						var hFile = NativeFileOperationsHelper.CreateFileForWrite(destination,
+						var hFile = Win32Helper.CreateFileForWrite(destination,
 							option == NameCollisionOption.ReplaceExisting);
 						if (!hFile.IsInvalid)
 						{
@@ -102,7 +102,7 @@ namespace Files.App.Utils.Storage
 							return new NativeStorageFile(destination, desiredNewName, DateTime.Now);
 						}
 					}
-					throw ex;
+					throw;
 				}
 			});
 		}
@@ -173,16 +173,21 @@ namespace Files.App.Utils.Storage
 		public override IAsyncOperation<StorageItemThumbnail> GetThumbnailAsync(ThumbnailMode mode, uint requestedSize, ThumbnailOptions options)
 			=> File.GetThumbnailAsync(mode, requestedSize, options);
 
-		private class SystemFileBasicProperties : BaseBasicProperties
+		private sealed class SystemFileBasicProperties : BaseBasicProperties
 		{
 			private readonly IStorageItemExtraProperties basicProps;
+			private readonly DateTimeOffset? dateCreated;
 
 			public override ulong Size => (basicProps as BasicProperties)?.Size ?? 0;
 
-			public override DateTimeOffset ItemDate => (basicProps as BasicProperties)?.ItemDate ?? DateTimeOffset.Now;
+			public override DateTimeOffset DateCreated => dateCreated ?? DateTimeOffset.Now;
 			public override DateTimeOffset DateModified => (basicProps as BasicProperties)?.DateModified ?? DateTimeOffset.Now;
 
-			public SystemFileBasicProperties(IStorageItemExtraProperties basicProps) => this.basicProps = basicProps;
+			public SystemFileBasicProperties(IStorageItemExtraProperties basicProps, DateTimeOffset dateCreated)
+			{
+				this.basicProps = basicProps;
+				this.dateCreated = dateCreated;
+			}
 
 			public override IAsyncOperation<IDictionary<string, object>> RetrievePropertiesAsync(IEnumerable<string> propertiesToRetrieve)
 				=> basicProps.RetrievePropertiesAsync(propertiesToRetrieve);

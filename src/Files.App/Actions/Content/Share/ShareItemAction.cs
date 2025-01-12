@@ -1,11 +1,11 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Windows.ApplicationModel.DataTransfer;
 
 namespace Files.App.Actions
 {
-	internal class ShareItemAction : ObservableObject, IAction
+	internal sealed class ShareItemAction : ObservableObject, IAction
 	{
 		private readonly IContentPageContext context;
 
@@ -16,7 +16,7 @@ namespace Files.App.Actions
 			=> "ShareItemDescription".GetLocalizedResource();
 
 		public RichGlyph Glyph
-			=> new(opacityStyle: "ColorIconShare");
+			=> new(themedIconStyle: "App.ThemedIcons.Share");
 
 		public bool IsExecutable =>
 			IsContextPageTypeAdaptedToCommand() &&
@@ -31,11 +31,9 @@ namespace Files.App.Actions
 			context.PropertyChanged += Context_PropertyChanged;
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
-			ShareItemHelpers.ShareItems(context.SelectedItems);
-
-			return Task.CompletedTask;
+			return ShareItemHelpers.ShareItemsAsync(context.SelectedItems);
 		}
 
 		private bool IsContextPageTypeAdaptedToCommand()

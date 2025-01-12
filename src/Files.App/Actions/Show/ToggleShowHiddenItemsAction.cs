@@ -1,9 +1,9 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Actions
 {
-	internal class ToggleShowHiddenItemsAction : ObservableObject, IToggleAction
+	internal sealed class ToggleShowHiddenItemsAction : ObservableObject, IToggleAction
 	{
 		private readonly IFoldersSettingsService settings;
 
@@ -26,7 +26,7 @@ namespace Files.App.Actions
 			settings.PropertyChanged += Settings_PropertyChanged;
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
 			settings.ShowHiddenItems = !settings.ShowHiddenItems;
 

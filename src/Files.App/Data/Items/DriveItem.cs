@@ -1,11 +1,7 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
-using Files.App.Storage.WindowsStorage;
-using Files.Core.Storage;
-using Files.Core.Storage.Enums;
-using Files.Core.Storage.LocatableStorage;
-using Files.Core.Storage.NestedStorage;
+using Files.App.Controls;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -15,7 +11,7 @@ using ByteSize = ByteSizeLib.ByteSize;
 
 namespace Files.App.Data.Items
 {
-	public class DriveItem : ObservableObject, INavigationControlItem, ILocatableFolder
+	public sealed class DriveItem : ObservableObject, INavigationControlItem, ILocatableFolder
 	{
 		private BitmapImage icon;
 		public BitmapImage Icon
@@ -52,7 +48,7 @@ namespace Files.App.Data.Items
 			=> Type == DriveType.Network;
 
 		public bool IsPinned
-			=> App.QuickAccessManager.Model.FavoriteItems.Contains(path);
+			=> App.QuickAccessManager.Model.PinnedFolders.Contains(path);
 
 		public string MaxSpaceText
 			=> MaxSpace.ToSizeString();
@@ -119,18 +115,25 @@ namespace Files.App.Data.Items
 		private DriveType type;
 		public DriveType Type
 		{
-			get => type; set
+			get => type;
+			set
 			{
 				type = value;
-				if (value == DriveType.Network)
-				{
-					ToolTip = "Network".GetLocalizedResource();
-				}
-				else if (value == DriveType.CloudDrive)
-				{
+
+				if (value is DriveType.Network or DriveType.CloudDrive)
 					ToolTip = Text;
-				}
+
+				OnPropertyChanged(nameof(TypeText));
 			}
+		}
+
+		public string TypeText => string.Format("DriveType{0}", Type).GetLocalizedResource();
+
+		private string filesystem = string.Empty;
+		public string Filesystem
+		{
+			get => filesystem;
+			set => SetProperty(ref filesystem, value);
 		}
 
 		private string text;
@@ -203,26 +206,30 @@ namespace Files.App.Data.Items
 			get
 			{
 				if (!IsRemovable)
-					return null; // Removable items don't need the eject button
+					return null; // Non-removable items don't need the eject button
+
 				var itemDecorator = new Button()
 				{
 					Style = Application.Current.Resources["SidebarEjectButtonStyle"] as Style,
-					Content = new OpacityIcon()
+					Content = new ThemedIcon()
 					{
-						Style = Application.Current.Resources["ColorIconEject"] as Style,
-						Height = 16,
-						Width = 16
+						Style = Application.Current.Resources["App.ThemedIcons.Actions.Eject.12"] as Style,
+						Height = 12,
+						Width = 12
 					}
 				};
+
+				ToolTipService.SetToolTip(itemDecorator, "Eject".GetLocalizedResource());
+
 				itemDecorator.Click += ItemDecorator_Click;
+
 				return itemDecorator;
 			}
 		}
 
-		private async void ItemDecorator_Click(object sender, RoutedEventArgs e)
+		private void ItemDecorator_Click(object sender, RoutedEventArgs e)
 		{
-			var result = await DriveHelpers.EjectDeviceAsync(Path);
-			await UIHelpers.ShowDeviceEjectResultAsync(Type, result);
+			DriveHelpers.EjectDeviceAsync(Path);
 		}
 
 		public static async Task<DriveItem> CreateFromPropertiesAsync(StorageFolder root, string deviceId, string label, DriveType type, IRandomAccessStream imageStream = null)
@@ -243,7 +250,6 @@ namespace Files.App.Data.Items
 				IsLocationItem = true,
 				ShowEjectDevice = item.IsRemovable,
 				ShowShellItems = true,
-				ShowFormatDrive = !(item.Type == DriveType.Network || string.Equals(root.Path, "C:\\", StringComparison.OrdinalIgnoreCase)),
 				ShowProperties = true
 			};
 			item.Path = string.IsNullOrEmpty(root.Path) ? $"\\\\?\\{root.Name}\\" : root.Path;
@@ -259,7 +265,7 @@ namespace Files.App.Data.Items
 		{
 			try
 			{
-				var properties = await Root.Properties.RetrievePropertiesAsync(new[] { "System.ItemNameDisplay" })
+				var properties = await Root.Properties.RetrievePropertiesAsync(["System.ItemNameDisplay"])
 					.AsTask().WithTimeoutAsync(TimeSpan.FromSeconds(5));
 				Text = (string)properties["System.ItemNameDisplay"];
 			}
@@ -272,7 +278,7 @@ namespace Files.App.Data.Items
 		{
 			try
 			{
-				var properties = await Root.Properties.RetrievePropertiesAsync(new[] { "System.FreeSpace", "System.Capacity" })
+				var properties = await Root.Properties.RetrievePropertiesAsync(["System.FreeSpace", "System.Capacity", "System.Volume.FileSystem"])
 					.AsTask().WithTimeoutAsync(TimeSpan.FromSeconds(5));
 
 				if (properties is not null && properties["System.Capacity"] is not null && properties["System.FreeSpace"] is not null)
@@ -292,12 +298,18 @@ namespace Files.App.Data.Items
 					MaxSpace = SpaceUsed = FreeSpace = ByteSize.FromBytes(0);
 				}
 
+				if (properties is not null && properties["System.Volume.FileSystem"] is not null)
+					Filesystem = (string)properties["System.Volume.FileSystem"];
+				else
+					Filesystem = string.Empty;
+
 				OnPropertyChanged(nameof(ShowDriveDetails));
 			}
 			catch (Exception)
 			{
 				SpaceText = "Unknown".GetLocalizedResource();
 				MaxSpace = SpaceUsed = FreeSpace = ByteSize.FromBytes(0);
+				Filesystem = string.Empty;
 
 				OnPropertyChanged(nameof(ShowDriveDetails));
 			}
@@ -309,30 +321,31 @@ namespace Files.App.Data.Items
 			return result == 0 ? Text.CompareTo(other.Text) : result;
 		}
 
-		public async Task LoadThumbnailAsync(bool isSidebar = false)
+		public async Task LoadThumbnailAsync()
 		{
-			if (!isSidebar)
+			if (!string.IsNullOrEmpty(DeviceID) && !string.Equals(DeviceID, "network-folder"))
+			{
+				var result = await FileThumbnailHelper.GetIconAsync(
+					DeviceID,
+					Constants.ShellIconSizes.Small,
+					false,
+					IconOptions.ReturnIconOnly | IconOptions.UseCurrentScale);
+
+				IconData ??= result;
+			}
+
+			if (Root is not null)
 			{
 				using var thumbnail = await DriveHelpers.GetThumbnailAsync(Root);
-				IconData ??= await thumbnail.ToByteArrayAsync();
+				IconData ??= thumbnail is not null ? await thumbnail.ToByteArrayAsync() : null;
 			}
-			else
-			{
-				if (!string.IsNullOrEmpty(DeviceID) && !string.Equals(DeviceID, "network-folder"))
-					IconData ??= await FileThumbnailHelper.LoadIconWithoutOverlayAsync(DeviceID, 16);
 
-				if (Root is not null)
-				{
-					using var thumbnail = await DriveHelpers.GetThumbnailAsync(Root);
-					IconData ??= await thumbnail.ToByteArrayAsync();
-				}
+			if (string.Equals(DeviceID, "network-folder"))
+				IconData ??= UIHelpers.GetSidebarIconResourceInfo(Constants.ImageRes.Network)?.IconData;
 
-				if (string.Equals(DeviceID, "network-folder"))
-					IconData ??= UIHelpers.GetSidebarIconResourceInfo(Constants.ImageRes.NetworkDrives).IconData;
+			IconData ??= UIHelpers.GetSidebarIconResourceInfo(Constants.ImageRes.Folder)?.IconData;
 
-				IconData ??= UIHelpers.GetSidebarIconResourceInfo(Constants.ImageRes.Folder).IconData;
-			}
-			Icon ??= await IconData.ToBitmapAsync();
+			Icon ??= IconData is not null ? await IconData.ToBitmapAsync() : null;
 		}
 
 		private string GetSizeString()
@@ -345,25 +358,25 @@ namespace Files.App.Data.Items
 
 		public Task<INestedFile> GetFileAsync(string fileName, CancellationToken cancellationToken = default)
 		{
-			var folder = new WindowsStorageFolder(Root);
+			var folder = new WindowsStorageFolderLegacy(Root);
 			return folder.GetFileAsync(fileName, cancellationToken);
 		}
 
 		public Task<INestedFolder> GetFolderAsync(string folderName, CancellationToken cancellationToken = default)
 		{
-			var folder = new WindowsStorageFolder(Root);
+			var folder = new WindowsStorageFolderLegacy(Root);
 			return folder.GetFolderAsync(folderName, cancellationToken);
 		}
 
 		public IAsyncEnumerable<INestedStorable> GetItemsAsync(StorableKind kind = StorableKind.All, CancellationToken cancellationToken = default)
 		{
-			var folder = new WindowsStorageFolder(Root);
+			var folder = new WindowsStorageFolderLegacy(Root);
 			return folder.GetItemsAsync(kind, cancellationToken);
 		}
 
 		public Task<IFolder?> GetParentAsync(CancellationToken cancellationToken = default)
 		{
-			var folder = new WindowsStorageFolder(Root);
+			var folder = new WindowsStorageFolderLegacy(Root);
 			return folder.GetParentAsync(cancellationToken);
 		}
 	}

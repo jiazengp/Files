@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Data.Commands
 {
@@ -11,5 +11,6 @@ namespace Files.App.Data.Commands
 
 		IRichCommand PasteItem { get; }
 		IRichCommand DeleteItem { get; }
+		IRichCommand OpenProperties { get; }
 	}
 }

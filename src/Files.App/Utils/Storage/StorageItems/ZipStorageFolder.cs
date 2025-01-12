@@ -1,5 +1,5 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Files.Shared.Helpers;
 using SevenZip;
@@ -11,6 +11,7 @@ using Windows.Foundation;
 using Windows.Storage;
 using Windows.Storage.FileProperties;
 using Windows.Storage.Search;
+using Windows.Win32;
 using IO = System.IO;
 
 namespace Files.App.Utils.Storage
@@ -100,7 +101,7 @@ namespace Files.App.Utils.Storage
 		{
 			Func<Task<bool>> queryFileAssoc = async () =>
 			{
-				var assoc = await NativeWinApiHelper.GetFileAssociationAsync(filePath);
+				var assoc = await Win32Helper.GetFileAssociationAsync(filePath);
 				if (assoc is not null)
 				{
 					return assoc == Package.Current.Id.FamilyName
@@ -198,7 +199,7 @@ namespace Files.App.Utils.Storage
 				var file = new ZipStorageFile(filePath, containerPath, entry, backingFile);
 				((IPasswordProtectedItem)file).CopyFrom(this);
 				return file;
-			}, ((IPasswordProtectedItem)this).RetryWithCredentials));
+			}, ((IPasswordProtectedItem)this).RetryWithCredentialsAsync));
 		}
 
 		public override IAsyncOperation<IStorageItem> TryGetItemAsync(string name)
@@ -254,7 +255,7 @@ namespace Files.App.Utils.Storage
 					}
 				}
 				return items;
-			}, ((IPasswordProtectedItem)this).RetryWithCredentials));
+			}, ((IPasswordProtectedItem)this).RetryWithCredentialsAsync));
 		}
 		public override IAsyncOperation<IReadOnlyList<IStorageItem>> GetItemsAsync(uint startIndex, uint maxItemsToRetrieve)
 			=> AsyncInfo.Run<IReadOnlyList<IStorageItem>>(async (cancellationToken)
@@ -330,13 +331,16 @@ namespace Files.App.Utils.Storage
 				var folder = new ZipStorageFolder(zipDesiredName, containerPath, backingFile);
 				((IPasswordProtectedItem)folder).CopyFrom(this);
 				return folder;
-			}, ((IPasswordProtectedItem)this).RetryWithCredentials));
+			}, ((IPasswordProtectedItem)this).RetryWithCredentialsAsync));
 		}
+
+		public override IAsyncOperation<BaseStorageFolder> MoveAsync(IStorageFolder destinationFolder) => throw new NotSupportedException();
+		public override IAsyncOperation<BaseStorageFolder> MoveAsync(IStorageFolder destinationFolder, NameCollisionOption option) => throw new NotSupportedException();
 
 		public override IAsyncAction RenameAsync(string desiredName) => RenameAsync(desiredName, NameCollisionOption.FailIfExists);
 		public override IAsyncAction RenameAsync(string desiredName, NameCollisionOption option)
 		{
-			return AsyncInfo.Run((cancellationToken) => SafetyExtensions.Wrap(async () =>
+			return AsyncInfo.Run((cancellationToken) => SafetyExtensions.WrapAsync(async () =>
 			{
 				if (Path == containerPath)
 				{
@@ -347,7 +351,7 @@ namespace Files.App.Utils.Storage
 					else
 					{
 						var fileName = IO.Path.Combine(IO.Path.GetDirectoryName(Path), desiredName);
-						NativeFileOperationsHelper.MoveFileFromApp(Path, fileName);
+						PInvoke.MoveFileFromApp(Path, fileName);
 					}
 				}
 				else
@@ -378,13 +382,13 @@ namespace Files.App.Utils.Storage
 						}
 					}
 				}
-			}, ((IPasswordProtectedItem)this).RetryWithCredentials));
+			}, ((IPasswordProtectedItem)this).RetryWithCredentialsAsync));
 		}
 
 		public override IAsyncAction DeleteAsync() => DeleteAsync(StorageDeleteOption.Default);
 		public override IAsyncAction DeleteAsync(StorageDeleteOption option)
 		{
-			return AsyncInfo.Run((cancellationToken) => SafetyExtensions.Wrap(async () =>
+			return AsyncInfo.Run((cancellationToken) => SafetyExtensions.WrapAsync(async () =>
 			{
 				if (Path == containerPath)
 				{
@@ -394,7 +398,7 @@ namespace Files.App.Utils.Storage
 					}
 					else if (option == StorageDeleteOption.PermanentDelete)
 					{
-						NativeFileOperationsHelper.DeleteFileFromApp(Path);
+						PInvoke.DeleteFileFromApp(Path);
 					}
 					else
 					{
@@ -426,7 +430,7 @@ namespace Files.App.Utils.Storage
 						}
 					}
 				}
-			}, ((IPasswordProtectedItem)this).RetryWithCredentials));
+			}, ((IPasswordProtectedItem)this).RetryWithCredentialsAsync));
 		}
 
 		public override bool AreQueryOptionsSupported(QueryOptions queryOptions) => false;
@@ -485,7 +489,7 @@ namespace Files.App.Utils.Storage
 		{
 			return SafetyExtensions.IgnoreExceptions(() =>
 			{
-				var hFile = NativeFileOperationsHelper.OpenFileForRead(path);
+				var hFile = Win32Helper.OpenFileForRead(path);
 				if (hFile.IsInvalid)
 				{
 					return false;
@@ -513,7 +517,7 @@ namespace Files.App.Utils.Storage
 				return false;
 			}
 		}
-		private static async Task<bool> CheckAccess(IStorageFile file)
+		private static async Task<bool> CheckAccess(BaseStorageFile file)
 		{
 			return await SafetyExtensions.IgnoreExceptions(async () =>
 			{
@@ -526,7 +530,7 @@ namespace Files.App.Utils.Storage
 		{
 			return SafetyExtensions.IgnoreExceptions(() =>
 			{
-				var hFile = NativeFileOperationsHelper.OpenFileForRead(path, true);
+				var hFile = Win32Helper.OpenFileForRead(path, true);
 				if (hFile.IsInvalid)
 				{
 					return Task.FromResult(false);
@@ -577,7 +581,7 @@ namespace Files.App.Utils.Storage
 				}
 				else
 				{
-					var hFile = NativeFileOperationsHelper.OpenFileForRead(containerPath, readWrite);
+					var hFile = Win32Helper.OpenFileForRead(containerPath, readWrite);
 					if (hFile.IsInvalid)
 					{
 						return null;
@@ -639,10 +643,10 @@ namespace Files.App.Utils.Storage
 				var file = new ZipStorageFile(zipDesiredName, containerPath, backingFile);
 				((IPasswordProtectedItem)file).CopyFrom(this);
 				return file;
-			}, ((IPasswordProtectedItem)this).RetryWithCredentials));
+			}, ((IPasswordProtectedItem)this).RetryWithCredentialsAsync));
 		}
 
-		private class ZipFolderBasicProperties : BaseBasicProperties
+		private sealed class ZipFolderBasicProperties : BaseBasicProperties
 		{
 			private ArchiveFileInfo entry;
 
@@ -650,7 +654,7 @@ namespace Files.App.Utils.Storage
 
 			public override DateTimeOffset DateModified => entry.LastWriteTime == DateTime.MinValue ? DateTimeOffset.MinValue : entry.LastWriteTime;
 
-			public override DateTimeOffset ItemDate => entry.CreationTime == DateTime.MinValue ? DateTimeOffset.MinValue : entry.CreationTime;
+			public override DateTimeOffset DateCreated => entry.CreationTime == DateTime.MinValue ? DateTimeOffset.MinValue : entry.CreationTime;
 
 			public override ulong Size => entry.Size;
 		}

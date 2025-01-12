@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Files.App.Extensions;
 using Files.Shared;
@@ -30,7 +30,7 @@ namespace Files.App.Utils.Shell
 			{
 				"Home" => "Home".GetLocalizedResource(),
 				Constants.UserEnvironmentPaths.RecycleBinPath => "RecycleBin".GetLocalizedResource(),
-				Constants.UserEnvironmentPaths.NetworkFolderPath => "SidebarNetworkDrives".GetLocalizedResource(),
+				Constants.UserEnvironmentPaths.NetworkFolderPath => "Network".GetLocalizedResource(),
 				Constants.UserEnvironmentPaths.MyComputerPath => "ThisPC".GetLocalizedResource(),
 				_ => shPath
 			};

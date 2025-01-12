@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Actions
 {
@@ -31,15 +31,23 @@ namespace Files.App.Actions
 			_tagsContext.PropertyChanged += Context_PropertyChanged;
 		}
 
-		public async Task ExecuteAsync()
+		public async Task ExecuteAsync(object? parameter = null)
 		{
-			var files = _tagsContext.TaggedItems.Where(item => !item.isFolder);
-			var folders = _tagsContext.TaggedItems.Where(item => item.isFolder);
+			var filePaths = _tagsContext.TaggedItems
+				.Where(item => !item.isFolder)
+				.Select(f => f.path)
+				.ToList();
+			
+			var folderPaths = _tagsContext
+				.TaggedItems
+				.Where(item => item.isFolder)
+				.Select(f => f.path)
+				.ToList();
+			
+			await Task.WhenAll(filePaths.Select(path => NavigationHelpers.OpenPath(path, _pageContext.ShellPage!)));
 
-			await Task.WhenAll(files.Select(file 
-				=> NavigationHelpers.OpenPath(file.path, _pageContext.ShellPage!)));
-
-			folders.ForEach(async folder => await NavigationHelpers.OpenPathInNewTab(folder.path));
+			foreach (var path in folderPaths) 
+				await NavigationHelpers.OpenPathInNewTab(path);
 		}
 
 		private void Context_PropertyChanged(object? sender, PropertyChangedEventArgs e)

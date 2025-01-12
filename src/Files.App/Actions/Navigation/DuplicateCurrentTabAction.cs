@@ -1,13 +1,11 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Actions
 {
-	internal class DuplicateCurrentTabAction : IAction
+	internal sealed class DuplicateCurrentTabAction : IAction
 	{
 		private readonly IMultitaskingContext context;
-
-		private readonly MainPageViewModel mainPageViewModel;
 
 		public string Label
 			=> "DuplicateTab".GetLocalizedResource();
@@ -18,16 +16,23 @@ namespace Files.App.Actions
 		public DuplicateCurrentTabAction()
 		{
 			context = Ioc.Default.GetRequiredService<IMultitaskingContext>();
-			mainPageViewModel = Ioc.Default.GetRequiredService<MainPageViewModel>();
 		}
 
-		public async Task ExecuteAsync()
+		public async Task ExecuteAsync(object? parameter = null)
 		{
-			var arguments = context.CurrentTabItem.TabItemArguments;
+			var arguments = context.CurrentTabItem.NavigationParameter;
+
 			if (arguments is null)
-				await mainPageViewModel.AddNewTabByPathAsync(typeof(PaneHolderPage), "Home");
+			{
+				await NavigationHelpers.AddNewTabByPathAsync(typeof(ShellPanesPage), "Home", true);
+			}
 			else
-				await mainPageViewModel.AddNewTabByParam(arguments.InitialPageType, arguments.NavigationArg, context.CurrentTabIndex + 1);
+			{
+				await NavigationHelpers.AddNewTabByParamAsync(
+					arguments.InitialPageType,
+					arguments.NavigationParameter,
+					context.CurrentTabIndex + 1);
+			}
 		}
 	}
 }

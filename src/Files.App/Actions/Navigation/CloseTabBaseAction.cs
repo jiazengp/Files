@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Actions
 {
@@ -30,7 +30,7 @@ namespace Files.App.Actions
 			context.PropertyChanged += Context_PropertyChanged;
 		}
 
-		public abstract Task ExecuteAsync();
+		public abstract Task ExecuteAsync(object? parameter = null);
 
 		protected virtual bool GetIsExecutable()
 		{

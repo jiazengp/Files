@@ -1,9 +1,9 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Actions
 {
-	internal class OpenTerminalAsAdminAction : OpenTerminalAction
+	internal sealed class OpenTerminalAsAdminAction : OpenTerminalAction
 	{
 		public override string Label
 			=> "OpenTerminalAsAdmin".GetLocalizedResource();

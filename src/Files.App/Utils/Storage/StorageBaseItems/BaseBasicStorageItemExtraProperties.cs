@@ -1,5 +1,5 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Foundation;
@@ -7,7 +7,7 @@ using Windows.Storage;
 
 namespace Files.App.Utils.Storage
 {
-	public class BaseBasicStorageItemExtraProperties : BaseStorageItemExtraProperties
+	public sealed class BaseBasicStorageItemExtraProperties : BaseStorageItemExtraProperties
 	{
 		private readonly IStorageItem _item;
 
@@ -30,7 +30,7 @@ namespace Files.App.Utils.Storage
 				var basicProps = ret is not null ? await ret : null;
 
 				props["System.ParsingPath"] = _item?.Path;
-				props["System.DateCreated"] = basicProps?.ItemDate;
+				props["System.DateCreated"] = basicProps?.DateCreated;
 				props["System.DateModified"] = basicProps?.DateModified;
 
 				return props;

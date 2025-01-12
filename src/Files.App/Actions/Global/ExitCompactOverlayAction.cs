@@ -1,11 +1,11 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Microsoft.UI.Windowing;
 
 namespace Files.App.Actions
 {
-	internal class ExitCompactOverlayAction : ObservableObject, IAction
+	internal sealed class ExitCompactOverlayAction : ObservableObject, IAction
 	{
 		private readonly IWindowContext windowContext;
 
@@ -13,10 +13,10 @@ namespace Files.App.Actions
 			=> "ExitCompactOverlay".GetLocalizedResource();
 
 		public RichGlyph Glyph
-			=> new(opacityStyle: "ColorIconExitCompactOverlay");
+			=> new(themedIconStyle: "App.ThemedIcons.CompactOverlayExit");
 
 		public HotKey HotKey
-			=> new(Keys.Down, KeyModifiers.MenuCtrl);
+			=> new(Keys.Down, KeyModifiers.CtrlAlt);
 
 		public string Description
 			=> "ExitCompactOverlayDescription".GetLocalizedResource();
@@ -31,7 +31,7 @@ namespace Files.App.Actions
 			windowContext.PropertyChanged += WindowContext_PropertyChanged;
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
 			var appWindow = MainWindow.Instance.AppWindow;
 			appWindow.SetPresenter(AppWindowPresenterKind.Overlapped);

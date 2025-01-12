@@ -1,8 +1,9 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Files.App.Dialogs;
 using Microsoft.UI.Xaml.Controls;
+using Windows.Foundation.Metadata;
 
 namespace Files.App.Actions
 {
@@ -18,32 +19,34 @@ namespace Files.App.Actions
 		{
 		}
 
-		public override async Task ExecuteAsync()
+		public override async Task ExecuteAsync(object? parameter = null)
 		{
-			var (sources, directory, fileName) = ArchiveHelpers.GetCompressDestination(context.ShellPage);
+			if (context.ShellPage is null)
+				return;
 
-			var dialog = new CreateArchiveDialog
-			{
-				FileName = fileName,
-			};
+			GetDestination(out var sources, out var directory, out var fileName);
+
+			var dialog = new CreateArchiveDialog() { FileName = fileName };
+
+			if (ApiInformation.IsApiContractPresent("Windows.Foundation.UniversalApiContract", 8))
+				dialog.XamlRoot = MainWindow.Instance.Content.XamlRoot;
 
 			var result = await dialog.TryShowAsync();
 
 			if (!dialog.CanCreate || result != ContentDialogResult.Primary)
 				return;
 
-			IArchiveCreator creator = new ArchiveCreator
-			{
-				Sources = sources,
-				Directory = directory,
-				FileName = dialog.FileName,
-				Password = dialog.Password,
-				FileFormat = dialog.FileFormat,
-				CompressionLevel = dialog.CompressionLevel,
-				SplittingSize = dialog.SplittingSize,
-			};
+			ICompressArchiveModel compressionModel = new CompressArchiveModel(
+				sources,
+				directory,
+				dialog.FileName,
+				dialog.CPUThreads,
+				dialog.Password,
+				dialog.FileFormat,
+				dialog.CompressionLevel,
+				dialog.SplittingSize);
 
-			await ArchiveHelpers.CompressArchiveAsync(creator);
+			await StorageArchiveService.CompressAsync(compressionModel);
 		}
 	}
 }

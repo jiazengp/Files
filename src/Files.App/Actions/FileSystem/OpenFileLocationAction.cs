@@ -1,11 +1,11 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using System.IO;
 
 namespace Files.App.Actions
 {
-	internal class OpenFileLocationAction : ObservableObject, IAction
+	internal sealed class OpenFileLocationAction : ObservableObject, IAction
 	{
 		private readonly IContentPageContext context;
 
@@ -19,8 +19,9 @@ namespace Files.App.Actions
 			=> new(baseGlyph: "\uE8DA");
 
 		public bool IsExecutable =>
+			context.ShellPage is not null &&
 			context.HasSelection &&
-			context.SelectedItem is ShortcutItem;
+			context.SelectedItem is IShortcutItem;
 
 		public OpenFileLocationAction()
 		{
@@ -29,8 +30,11 @@ namespace Files.App.Actions
 			context.PropertyChanged += Context_PropertyChanged;
 		}
 
-		public async Task ExecuteAsync()
+		public async Task ExecuteAsync(object? parameter = null)
 		{
+			if (context.ShellPage?.ShellViewModel is null)
+				return;
+
 			var item = context.SelectedItem as ShortcutItem;
 
 			if (string.IsNullOrWhiteSpace(item?.TargetPath))
@@ -38,14 +42,14 @@ namespace Files.App.Actions
 
 			// Check if destination path exists
 			var folderPath = Path.GetDirectoryName(item.TargetPath);
-			var destFolder = await context.ShellPage?.FilesystemViewModel.GetFolderWithPathFromPathAsync(folderPath);
+			var destFolder = await context.ShellPage.ShellViewModel.GetFolderWithPathFromPathAsync(folderPath);
 
 			if (destFolder)
 			{
-				context.ShellPage?.NavigateWithArguments(context.ShellPage?.InstanceViewModel.FolderSettings.GetLayoutType(folderPath), new NavigationArguments()
+				context.ShellPage?.NavigateWithArguments(context.ShellPage.InstanceViewModel.FolderSettings.GetLayoutType(folderPath), new NavigationArguments()
 				{
 					NavPathParam = folderPath,
-					SelectItems = new[] { Path.GetFileName(item.TargetPath.TrimPath()) },
+					SelectItems = [Path.GetFileName(item.TargetPath.TrimPath())],
 					AssociatedTabInstance = context.ShellPage
 				});
 			}

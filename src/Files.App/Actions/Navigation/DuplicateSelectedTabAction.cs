@@ -1,13 +1,11 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Actions
 {
-	internal class DuplicateSelectedTabAction : IAction
+	internal sealed class DuplicateSelectedTabAction : ObservableObject, IAction
 	{
 		private readonly IMultitaskingContext context;
-
-		private readonly MainPageViewModel mainPageViewModel;
 
 		public string Label
 			=> "DuplicateTab".GetLocalizedResource();
@@ -18,19 +16,33 @@ namespace Files.App.Actions
 		public HotKey HotKey
 			=> new(Keys.K, KeyModifiers.CtrlShift);
 
+		public bool IsExecutable
+			=> context.SelectedTabItem is not null;
+
 		public DuplicateSelectedTabAction()
 		{
 			context = Ioc.Default.GetRequiredService<IMultitaskingContext>();
-			mainPageViewModel = Ioc.Default.GetRequiredService<MainPageViewModel>();
+			context.PropertyChanged += MultitaskingContext_PropertyChanged;
 		}
 
-		public async Task ExecuteAsync()
+		public async Task ExecuteAsync(object? parameter = null)
 		{
-			var arguments = context.SelectedTabItem.TabItemArguments;
+			var arguments = context.SelectedTabItem.NavigationParameter;
+
 			if (arguments is null)
-				await mainPageViewModel.AddNewTabByPathAsync(typeof(PaneHolderPage), "Home");
+			{
+				await NavigationHelpers.AddNewTabByPathAsync(typeof(ShellPanesPage), "Home", true);
+			}
 			else
-				await mainPageViewModel.AddNewTabByParam(arguments.InitialPageType, arguments.NavigationArg, context.SelectedTabIndex + 1);
+			{
+				await NavigationHelpers.AddNewTabByParamAsync(arguments.InitialPageType, arguments.NavigationParameter, context.SelectedTabIndex + 1);
+			}
+		}
+
+		private void MultitaskingContext_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+		{
+			if (e.PropertyName == nameof(IMultitaskingContext.SelectedTabItem))
+				OnPropertyChanged(nameof(IsExecutable));
 		}
 	}
 }

@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using System.Runtime.InteropServices;
 using System.Security;
@@ -7,7 +7,7 @@ using System.Security;
 namespace Files.App.Utils.Storage
 {
 	// Code from System.Net.NetworkCredential
-	public class StorageCredential
+	public sealed class StorageCredential
 	{
 		private string _userName = string.Empty;
 		public string UserName

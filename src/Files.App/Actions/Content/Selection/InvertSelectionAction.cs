@@ -1,9 +1,9 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Actions
 {
-	internal class InvertSelectionAction : IAction
+	internal sealed class InvertSelectionAction : IAction
 	{
 		private readonly IContentPageContext context;
 
@@ -14,7 +14,7 @@ namespace Files.App.Actions
 			=> "InvertSelectionDescription".GetLocalizedResource();
 
 		public RichGlyph Glyph
-			=> new("\uE746");
+			=> new(themedIconStyle: "App.ThemedIcons.SelectInvert");
 
 		public bool IsExecutable
 		{
@@ -30,10 +30,11 @@ namespace Files.App.Actions
 				if (page is null)
 					return false;
 
+				bool isCommandPaletteOpen = page.ToolbarViewModel.IsCommandPaletteOpen;
 				bool isEditing = page.ToolbarViewModel.IsEditModeEnabled;
 				bool isRenaming = page.SlimContentPage.IsRenamingItem;
 
-				return !isEditing && !isRenaming;
+				return isCommandPaletteOpen || (!isEditing && !isRenaming);
 			}
 		}
 
@@ -42,7 +43,7 @@ namespace Files.App.Actions
 			context = Ioc.Default.GetRequiredService<IContentPageContext>();
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
 			context?.ShellPage?.SlimContentPage?.ItemManipulationModel?.InvertSelection();
 

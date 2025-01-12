@@ -1,9 +1,9 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Actions
 {
-	internal class AddItemAction : ObservableObject, IAction
+	internal sealed class AddItemAction : ObservableObject, IAction
 	{
 		private readonly IContentPageContext context;
 
@@ -17,11 +17,11 @@ namespace Files.App.Actions
 		public string Description
 			=> "AddItemDescription".GetLocalizedResource();
 
-		public HotKey HotKey
-			=> new(Keys.N, KeyModifiers.CtrlShift);
-
 		public RichGlyph Glyph
-			=> new(opacityStyle: "ColorIconNew");
+			=> new(themedIconStyle: "App.ThemedIcons.New.Item");
+
+		public HotKey HotKey
+			=> new(Keys.I, KeyModifiers.CtrlShift);
 
 		public bool IsExecutable
 			=> context.CanCreateItem;
@@ -34,7 +34,7 @@ namespace Files.App.Actions
 			context.PropertyChanged += Context_PropertyChanged;
 		}
 
-		public async Task ExecuteAsync()
+		public async Task ExecuteAsync(object? parameter = null)
 		{
 			await dialogService.ShowDialogAsync(viewModel);
 
@@ -44,11 +44,13 @@ namespace Files.App.Actions
 			}
 			else if (viewModel.ResultType.ItemType != AddItemDialogItemType.Cancel)
 			{
-				await UIFilesystemHelpers.CreateFileFromDialogResultType(
+				await UIFilesystemHelpers.CreateFileFromDialogResultTypeAsync(
 					viewModel.ResultType.ItemType,
 					viewModel.ResultType.ItemInfo,
 					context.ShellPage!);
 			}
+
+			viewModel.ResultType.ItemType = AddItemDialogItemType.Cancel;
 		}
 
 		private void Context_PropertyChanged(object? sender, PropertyChangedEventArgs e)

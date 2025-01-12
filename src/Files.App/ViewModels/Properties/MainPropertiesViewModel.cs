@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Files.App.Views.Properties;
 using Microsoft.UI.Windowing;
@@ -9,7 +9,7 @@ using Microsoft.UI.Xaml.Media.Animation;
 
 namespace Files.App.ViewModels.Properties
 {
-	public class MainPropertiesViewModel : ObservableObject
+	public sealed class MainPropertiesViewModel : ObservableObject
 	{
 		public CancellationTokenSource ChangedPropertiesCancellationTokenSource { get; }
 
@@ -21,16 +21,14 @@ namespace Files.App.ViewModels.Properties
 			get => _SelectedNavigationViewItem;
 			set
 			{
-				if (SetProperty(ref _SelectedNavigationViewItem, value) &&
-					!_selectionChangedAutomatically)
+				if (SetProperty(ref _SelectedNavigationViewItem, value))
 				{
-					var parameter = new PropertiesPageNavigationParameter()
+					var parameter = new PropertiesPageNavigationParameter
 					{
 						AppInstance = _parameter.AppInstance,
 						CancellationTokenSource = ChangedPropertiesCancellationTokenSource,
 						Parameter = _parameter.Parameter,
-						Window = Window,
-						AppWindow = AppWindow,
+						Window = Window
 					};
 
 					var page = value.ItemType switch
@@ -48,8 +46,6 @@ namespace Files.App.ViewModels.Properties
 
 					_mainFrame?.Navigate(page, parameter, new EntranceNavigationTransitionInfo());
 				}
-
-				_selectionChangedAutomatically = false;
 			}
 		}
 
@@ -79,36 +75,32 @@ namespace Files.App.ViewModels.Properties
 
 		private readonly Window Window;
 
-		private readonly AppWindow AppWindow;
-
+		private AppWindow AppWindow => Window.AppWindow;
 		private readonly Frame _mainFrame;
 
 		private readonly BaseProperties _baseProperties;
 
 		private readonly PropertiesPageNavigationParameter _parameter;
 
-		private bool _selectionChangedAutomatically { get; set; }
-
 		public IRelayCommand DoBackwardNavigationCommand { get; }
 		public IAsyncRelayCommand SaveChangedPropertiesCommand { get; }
 		public IRelayCommand CancelChangedPropertiesCommand { get; }
 
-		public MainPropertiesViewModel(Window window, AppWindow appWindow, Frame mainFrame, BaseProperties baseProperties, PropertiesPageNavigationParameter parameter)
+		public MainPropertiesViewModel(Window window, Frame mainFrame, BaseProperties baseProperties, PropertiesPageNavigationParameter parameter)
 		{
 			ChangedPropertiesCancellationTokenSource = new();
 
 			Window = window;
-			AppWindow = appWindow;
 			_mainFrame = mainFrame;
 			_parameter = parameter;
 			_baseProperties = baseProperties;
 
 			DoBackwardNavigationCommand = new RelayCommand(ExecuteDoBackwardNavigationCommand);
-			SaveChangedPropertiesCommand = new AsyncRelayCommand(ExecuteSaveChangedPropertiesCommand);
+			SaveChangedPropertiesCommand = new AsyncRelayCommand(ExecuteSaveChangedPropertiesCommandAsync);
 			CancelChangedPropertiesCommand = new RelayCommand(ExecuteCancelChangedPropertiesCommand);
 
 			NavigationViewItems = PropertiesNavigationViewItemFactory.Initialize(parameter.Parameter);
-			SelectedNavigationViewItem = NavigationViewItems.Where(x => x.ItemType == PropertiesNavigationViewItemType.General).First();
+			SelectedNavigationViewItem = NavigationViewItems.First(x => x.ItemType == PropertiesNavigationViewItemType.General);
 		}
 
 		private void ExecuteDoBackwardNavigationCommand()
@@ -123,8 +115,6 @@ namespace Files.App.ViewModels.Properties
 
 			var pageTag = ((Page)_mainFrame.Content).Tag.ToString();
 
-			_selectionChangedAutomatically = true;
-
 			// Move selection indicator
 			_SelectedNavigationViewItem =
 				NavigationViewItems.First(x => string.Equals(x.ItemType.ToString(), pageTag, StringComparison.CurrentCultureIgnoreCase))
@@ -132,9 +122,9 @@ namespace Files.App.ViewModels.Properties
 			OnPropertyChanged(nameof(SelectedNavigationViewItem));
 		}
 
-		private async Task ExecuteSaveChangedPropertiesCommand()
+		private async Task ExecuteSaveChangedPropertiesCommandAsync()
 		{
-			await ApplyChanges();
+			await ApplyChangesAsync();
 			Window.Close();
 		}
 
@@ -143,7 +133,7 @@ namespace Files.App.ViewModels.Properties
 			Window.Close();
 		}
 
-		private async Task ApplyChanges()
+		private async Task ApplyChangesAsync()
 		{
 			if (_mainFrame is not null && _mainFrame.Content is not null)
 				await ((BasePropertiesPage)_mainFrame.Content).SaveChangesAsync();

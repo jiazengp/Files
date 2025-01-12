@@ -1,12 +1,12 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
 
 namespace Files.App.ViewModels.Properties
 {
-	internal class LibraryProperties : BaseProperties
+	internal sealed class LibraryProperties : BaseProperties
 	{
 		public LibraryItem Library { get; private set; }
 
@@ -27,7 +27,7 @@ namespace Files.App.ViewModels.Properties
 		{
 			Library = library;
 			GetBaseProperties();
-			GetSpecialProperties();
+			GetSpecialPropertiesAsync();
 		}
 
 		public override void GetBaseProperties()
@@ -44,26 +44,32 @@ namespace Files.App.ViewModels.Properties
 			}
 		}
 
-		public async override Task GetSpecialProperties()
+		public async override Task GetSpecialPropertiesAsync()
 		{
-			ViewModel.IsReadOnly = NativeFileOperationsHelper.HasFileAttribute(Library.ItemPath, System.IO.FileAttributes.ReadOnly);
-			ViewModel.IsHidden = NativeFileOperationsHelper.HasFileAttribute(Library.ItemPath, System.IO.FileAttributes.Hidden);
+			ViewModel.IsReadOnly = Win32Helper.HasFileAttribute(Library.ItemPath, System.IO.FileAttributes.ReadOnly);
+			ViewModel.IsHidden = Win32Helper.HasFileAttribute(Library.ItemPath, System.IO.FileAttributes.Hidden);
+			ViewModel.CanCompressContent = false;
 
-			var fileIconData = await FileThumbnailHelper.LoadIconWithoutOverlayAsync(Library.ItemPath, 80);
-			if (fileIconData is not null)
+			var result = await FileThumbnailHelper.GetIconAsync(
+				Library.ItemPath,
+				Constants.ShellIconSizes.ExtraLarge,
+				true,
+				IconOptions.UseCurrentScale);
+			
+			if (result is not null)
 			{
-				ViewModel.IconData = fileIconData;
+				ViewModel.IconData = result;
 				ViewModel.LoadCustomIcon = false;
 				ViewModel.LoadFileIcon = true;
 			}
 
-			BaseStorageFile libraryFile = await AppInstance.FilesystemViewModel.GetFileFromPathAsync(Library.ItemPath);
+			BaseStorageFile libraryFile = await AppInstance.ShellViewModel.GetFileFromPathAsync(Library.ItemPath);
 			if (libraryFile is not null)
 			{
 				ViewModel.ItemCreatedTimestampReal = libraryFile.DateCreated;
 				if (libraryFile.Properties is not null)
 				{
-					GetOtherProperties(libraryFile.Properties);
+					GetOtherPropertiesAsync(libraryFile.Properties);
 				}
 			}
 
@@ -74,7 +80,7 @@ namespace Files.App.ViewModels.Properties
 				{
 					foreach (var path in Library.Folders)
 					{
-						BaseStorageFolder folder = await AppInstance.FilesystemViewModel.GetFolderFromPathAsync(path);
+						BaseStorageFolder folder = await AppInstance.ShellViewModel.GetFolderFromPathAsync(path);
 						if (!string.IsNullOrEmpty(folder.Path))
 						{
 							storageFolders.Add(folder);
@@ -91,7 +97,7 @@ namespace Files.App.ViewModels.Properties
 			{
 				ViewModel.ContainsFilesOrFolders = true;
 				ViewModel.LocationsCount = storageFolders.Count;
-				GetLibrarySize(storageFolders, TokenSource.Token);
+				GetLibrarySizeAsync(storageFolders, TokenSource.Token);
 			}
 			else
 			{
@@ -99,7 +105,7 @@ namespace Files.App.ViewModels.Properties
 			}
 		}
 
-		private async Task GetLibrarySize(List<BaseStorageFolder> storageFolders, CancellationToken token)
+		private async Task GetLibrarySizeAsync(List<BaseStorageFolder> storageFolders, CancellationToken token)
 		{
 			ViewModel.ItemSizeVisibility = true;
 			ViewModel.ItemSizeProgressVisibility = true;
@@ -136,25 +142,23 @@ namespace Files.App.ViewModels.Properties
 			switch (e.PropertyName)
 			{
 				case "IsReadOnly":
-					if (ViewModel.IsReadOnly)
+					if (ViewModel.IsReadOnly is not null)
 					{
-						NativeFileOperationsHelper.SetFileAttribute(Library.ItemPath, System.IO.FileAttributes.ReadOnly);
-					}
-					else
-					{
-						NativeFileOperationsHelper.UnsetFileAttribute(Library.ItemPath, System.IO.FileAttributes.ReadOnly);
+						if ((bool)ViewModel.IsReadOnly)
+							Win32Helper.SetFileAttribute(Library.ItemPath, System.IO.FileAttributes.ReadOnly);
+						else
+							Win32Helper.UnsetFileAttribute(Library.ItemPath, System.IO.FileAttributes.ReadOnly);
 					}
 
 					break;
 
 				case "IsHidden":
-					if (ViewModel.IsHidden)
+					if (ViewModel.IsHidden is not null)
 					{
-						NativeFileOperationsHelper.SetFileAttribute(Library.ItemPath, System.IO.FileAttributes.Hidden);
-					}
-					else
-					{
-						NativeFileOperationsHelper.UnsetFileAttribute(Library.ItemPath, System.IO.FileAttributes.Hidden);
+						if ((bool)ViewModel.IsHidden)
+							Win32Helper.SetFileAttribute(Library.ItemPath, System.IO.FileAttributes.Hidden);
+						else
+							Win32Helper.UnsetFileAttribute(Library.ItemPath, System.IO.FileAttributes.Hidden);
 					}
 
 					break;

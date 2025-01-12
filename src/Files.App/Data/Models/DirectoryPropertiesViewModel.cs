@@ -1,22 +1,25 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using System.Windows.Input;
 
-namespace Files.App.Data.Models
+namespace Files.App.ViewModels.UserControls
 {
-	public class DirectoryPropertiesViewModel : ObservableObject
+	public sealed class StatusBarViewModel : ObservableObject
 	{
 		private IContentPageContext ContentPageContext { get; } = Ioc.Default.GetRequiredService<IContentPageContext>();
+		private IDevToolsSettingsService DevToolsSettingsService = Ioc.Default.GetRequiredService<IDevToolsSettingsService>();
 
 		// The first branch will always be the active one.
 		public const int ACTIVE_BRANCH_INDEX = 0;
 
 		private string? _gitRepositoryPath;
 
-		private readonly ObservableCollection<string> _localBranches = new();
+		private readonly ObservableCollection<BranchItem> _localBranches = [];
 
-		private readonly ObservableCollection<string> _remoteBranches = new();
+		private readonly ObservableCollection<BranchItem> _remoteBranches = [];
+
+		public bool IsBranchesFlyoutExpanded { get; set; } = false;
 
 		private string? _DirectoryItemCount;
 		public string? DirectoryItemCount
@@ -41,9 +44,9 @@ namespace Files.App.Data.Models
 				if (SetProperty(ref _SelectedBranchIndex, value) && 
 					value != -1 && 
 					(value != ACTIVE_BRANCH_INDEX || !_ShowLocals) &&
-					value < BranchesNames.Count)
+					value < Branches.Count)
 				{
-					CheckoutRequested?.Invoke(this, BranchesNames[value]);
+					CheckoutRequested?.Invoke(this, Branches[value].Name);
 				}
 			}
 		}
@@ -56,7 +59,7 @@ namespace Files.App.Data.Models
 			{
 				if (SetProperty(ref _ShowLocals, value))
 				{
-					OnPropertyChanged(nameof(BranchesNames));
+					OnPropertyChanged(nameof(Branches));
 
 					if (value)
 						SelectedBranchIndex = ACTIVE_BRANCH_INDEX;
@@ -78,7 +81,16 @@ namespace Files.App.Data.Models
 			set => SetProperty(ref _ExtendedStatusInfo, value);
 		}
 
-		public ObservableCollection<string> BranchesNames => _ShowLocals 
+		public bool ShowOpenInIDEButton
+		{
+			get
+			{
+				return DevToolsSettingsService.OpenInIDEOption == OpenInIDEOption.AllLocations ||
+					   (DevToolsSettingsService.OpenInIDEOption == OpenInIDEOption.GitRepos && GitBranchDisplayName is not null);
+			}
+		}
+
+		public ObservableCollection<BranchItem> Branches => _ShowLocals 
 			? _localBranches 
 			: _remoteBranches;
 
@@ -86,44 +98,71 @@ namespace Files.App.Data.Models
 
 		public ICommand NewBranchCommand { get; }
 
-		public DirectoryPropertiesViewModel()
+		public StatusBarViewModel()
 		{
 			NewBranchCommand = new AsyncRelayCommand(()
-				=> GitHelpers.CreateNewBranch(_gitRepositoryPath!, _localBranches[ACTIVE_BRANCH_INDEX]));
+				=> GitHelpers.CreateNewBranchAsync(_gitRepositoryPath!, _localBranches[ACTIVE_BRANCH_INDEX].Name));
+
+			DevToolsSettingsService.PropertyChanged += (s, e) =>
+			{
+				switch (e.PropertyName)
+				{
+					case nameof(DevToolsSettingsService.OpenInIDEOption):
+						OnPropertyChanged(nameof(ShowOpenInIDEButton));
+						break;
+				}
+			};
 		}
 
-		public void UpdateGitInfo(bool isGitRepository, string? repositoryPath, BranchItem[] branches)
+		public void UpdateGitInfo(bool isGitRepository, string? repositoryPath, BranchItem? head)
 		{
-			GitBranchDisplayName = isGitRepository &&
-								branches.Any() &&
-								!(ContentPageContext.ShellPage!.InstanceViewModel.IsPageTypeSearchResults)
-				? branches[ACTIVE_BRANCH_INDEX].Name
-				: null;
+			GitBranchDisplayName =
+				isGitRepository &&
+				head is not null &&
+				ContentPageContext.ShellPage is not null &&
+				!ContentPageContext.ShellPage.InstanceViewModel.IsPageTypeSearchResults
+					? head.Name
+					: null;
 
 			_gitRepositoryPath = repositoryPath;
-			ShowLocals = true;
+			
+			// Change ShowLocals value only if branches flyout is closed
+			if (!IsBranchesFlyoutExpanded)
+				ShowLocals = true;
 
-			var behind = branches.Any() ? branches[0].BehindBy ?? 0 : 0;
-			var ahead = branches.Any() ? branches[0].AheadBy ?? 0 : 0;
+			var behind = head is not null ? head.BehindBy ?? 0 : 0;
+			var ahead = head is not null ? head.AheadBy ?? 0 : 0;
 
 			ExtendedStatusInfo = string.Format("GitSyncStatusExtendedInfo".GetLocalizedResource(), ahead, behind);
 			StatusInfo = $"{ahead} / {behind}";
 
-			if (isGitRepository)
+			OnPropertyChanged(nameof(ShowOpenInIDEButton));
+		}
+
+		public async Task LoadBranches()
+		{
+			if (string.IsNullOrEmpty(_gitRepositoryPath))
+				return;
+
+			var branches = await GitHelpers.GetBranchesNames(_gitRepositoryPath);
+
+			_localBranches.Clear();
+			_remoteBranches.Clear();
+
+			foreach (var branch in branches)
 			{
-				_localBranches.Clear();
-				_remoteBranches.Clear();
-
-				foreach (var branch in branches)
-				{
-					if (branch.IsRemote)
-						_remoteBranches.Add(branch.Name);
-					else
-						_localBranches.Add(branch.Name);
-				}
-
-				SelectedBranchIndex = ACTIVE_BRANCH_INDEX;
+				if (branch.IsRemote)
+					_remoteBranches.Add(branch);
+				else
+					_localBranches.Add(branch);
 			}
+
+			SelectedBranchIndex = ShowLocals ? ACTIVE_BRANCH_INDEX : -1;
+		}
+
+		public Task ExecuteDeleteBranch(string? branchName)
+		{
+			return GitHelpers.DeleteBranchAsync(_gitRepositoryPath, GitBranchDisplayName, branchName);
 		}
 	}
 }

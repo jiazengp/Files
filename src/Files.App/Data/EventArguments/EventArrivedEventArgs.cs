@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Microsoft.Management.Infrastructure;
 using System;
@@ -9,7 +9,7 @@ namespace Files.App.Data.EventArguments
 	/// <summary>
 	/// CimWatcher event args, which contains CimSubscriptionResult
 	/// </summary>
-	public class EventArrivedEventArgs : EventArgs
+	public sealed class EventArrivedEventArgs : EventArgs
 	{
 		public CimSubscriptionResult NewEvent { get; }
 

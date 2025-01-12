@@ -1,14 +1,16 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Files.App.ViewModels.Properties;
 using Files.Shared.Helpers;
 using FluentFTP;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media.Imaging;
+using System.Drawing;
 using System.IO;
 using System.Text;
 using Windows.Storage;
+using Windows.Win32.UI.WindowsAndMessaging;
 
 #pragma warning disable CS0618 // Type or member is obsolete
 
@@ -17,6 +19,8 @@ namespace Files.App.Utils
 	public class ListedItem : ObservableObject, IGroupableItem
 	{
 		protected static IUserSettingsService UserSettingsService { get; } = Ioc.Default.GetRequiredService<IUserSettingsService>();
+
+		protected static IStartMenuService StartMenuService { get; } = Ioc.Default.GetRequiredService<IStartMenuService>();
 
 		protected static readonly IFileTagsSettingsService fileTagsSettingsService = Ioc.Default.GetRequiredService<IFileTagsSettingsService>();
 
@@ -38,13 +42,15 @@ namespace Files.App.Utils
 			get
 			{
 				var tooltipBuilder = new StringBuilder();
-				tooltipBuilder.AppendLine($"{"ToolTipDescriptionName".GetLocalizedResource()} {Name}");
+				tooltipBuilder.AppendLine($"{"NameWithColon".GetLocalizedResource()} {Name}");
 				tooltipBuilder.AppendLine($"{"ItemType".GetLocalizedResource()} {itemType}");
 				tooltipBuilder.Append($"{"ToolTipDescriptionDate".GetLocalizedResource()} {ItemDateModified}");
-				if(!string.IsNullOrWhiteSpace(FileSize))
+				if (!string.IsNullOrWhiteSpace(FileSize))
 					tooltipBuilder.Append($"{Environment.NewLine}{"SizeLabel".GetLocalizedResource()} {FileSize}");
-				if(SyncStatusUI.LoadSyncStatus)
-					tooltipBuilder.Append($"{Environment.NewLine}{"syncStatusColumn/Header".GetLocalizedResource()}: {syncStatusUI.SyncStatusString}");
+				if (SyncStatusUI.SyncStatus is not CloudDriveSyncStatus.FileOnline and not CloudDriveSyncStatus.FolderOnline && !string.IsNullOrWhiteSpace(DimensionsDisplay))
+					tooltipBuilder.Append($"{Environment.NewLine}{"PropertyDimensionsColon".GetLocalizedResource()} {DimensionsDisplay}");
+				if (SyncStatusUI.LoadSyncStatus)
+					tooltipBuilder.Append($"{Environment.NewLine}{"StatusWithColon".GetLocalizedResource()} {syncStatusUI.SyncStatusString}");
 
 				return tooltipBuilder.ToString();
 			}
@@ -66,13 +72,6 @@ namespace Files.App.Utils
 		{
 			get => loadFileIcon;
 			set => SetProperty(ref loadFileIcon, value);
-		}
-
-		private bool loadWebShortcutGlyph;
-		public bool LoadWebShortcutGlyph
-		{
-			get => loadWebShortcutGlyph;
-			set => SetProperty(ref loadWebShortcutGlyph, value);
 		}
 
 		private bool loadCustomIcon;
@@ -97,18 +96,27 @@ namespace Files.App.Utils
 
 		public ulong? FileFRN { get; set; }
 
-		private string[] fileTags; // TODO: initialize to empty array after UI is done
+		private string[] fileTags = null!;
 		public string[] FileTags
 		{
 			get => fileTags;
 			set
 			{
+				// fileTags is null when the item is first created
+				var fileTagsInitialized = fileTags is not null;
 				if (SetProperty(ref fileTags, value))
 				{
-					var dbInstance = FileTagsHelper.GetDbInstance();
-					dbInstance.SetTags(ItemPath, FileFRN, value);
+					Debug.Assert(value != null);
+
+					// only set the tags if the file tags have been changed
+					if (fileTagsInitialized)
+					{
+						var dbInstance = FileTagsHelper.GetDbInstance();
+						dbInstance.SetTags(ItemPath, FileFRN, value);
+						FileTagsHelper.WriteFileTag(ItemPath, value);
+					}
+
 					HasTags = !FileTags.IsEmpty();
-					FileTagsHelper.WriteFileTag(ItemPath, value);
 					OnPropertyChanged(nameof(FileTagsUI));
 				}
 			}
@@ -174,13 +182,12 @@ namespace Files.App.Utils
 					{
 						LoadFileIcon = true;
 						NeedsPlaceholderGlyph = false;
-						LoadWebShortcutGlyph = false;
 					}
 				}
 			}
 		}
 
-		public bool IsItemPinnedToStart => App.SecondaryTileHelper.CheckFolderPinned(ItemPath);
+		public bool IsItemPinnedToStart => StartMenuService.IsPinned((this as ShortcutItem)?.TargetPath ?? ItemPath);
 
 		private BitmapImage iconOverlay;
 		public BitmapImage IconOverlay
@@ -323,6 +330,41 @@ namespace Files.App.Utils
 			set => SetProperty(ref itemProperties, value);
 		}
 
+		public string DimensionsDisplay
+		{
+			get
+			{
+				int imageHeight = 0;
+				int imageWidth = 0;
+
+				var isImageFile = FileExtensionHelpers.IsImageFile(FileExtension);
+				if (isImageFile)
+				{
+					try
+					{
+						// TODO: Consider to use 'System.Kind' instead.
+						using FileStream fileStream = new(ItemPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+						using Image image = Image.FromStream(fileStream, false, false);
+
+						if (image is not null)
+						{
+							imageHeight = image.Height;
+							imageWidth = image.Width;
+						}
+					}
+					catch { }
+				}
+
+
+				return
+					isImageFile &&
+					imageWidth > 0 &&
+					imageHeight > 0
+						? $"{imageWidth} \u00D7 {imageHeight}"
+						: string.Empty;
+			}
+		}
+
 		/// <summary>
 		/// Initializes a new instance of the <see cref="ListedItem" /> class.
 		/// </summary>
@@ -364,17 +406,18 @@ namespace Files.App.Utils
 
 		public bool IsFolder => PrimaryItemAttribute is StorageItemTypes.Folder;
 		public bool IsRecycleBinItem => this is RecycleBinItem;
-		public bool IsShortcut => this is ShortcutItem;
+		public bool IsShortcut => this is IShortcutItem;
 		public bool IsLibrary => this is LibraryItem;
 		public bool IsLinkItem => IsShortcut && ((ShortcutItem)this).IsUrl;
 		public bool IsFtpItem => this is FtpItem;
 		public bool IsArchive => this is ZipItem;
 		public bool IsAlternateStream => this is AlternateStreamItem;
-		public bool IsGitItem => this is GitItem;
-		public virtual bool IsExecutable => FileExtensionHelpers.IsExecutableFile(ItemPath);
-		public bool IsPinned => App.QuickAccessManager.Model.FavoriteItems.Contains(itemPath);
+		public bool IsGitItem => this is IGitItem;
+		public virtual bool IsExecutable => !IsFolder && FileExtensionHelpers.IsExecutableFile(ItemPath);
+		public virtual bool IsScriptFile => FileExtensionHelpers.IsScriptFile(ItemPath);
+		public bool IsPinned => App.QuickAccessManager.Model.PinnedFolders.Contains(itemPath);
 		public bool IsDriveRoot => ItemPath == PathNormalization.GetPathRoot(ItemPath);
-		public bool IsElevated => CheckElevationRights();
+		public bool IsElevationRequired { get; set; }
 
 		private BaseStorageFile itemFile;
 		public BaseStorageFile ItemFile
@@ -398,16 +441,9 @@ namespace Files.App.Utils
 		{
 			ContainsFilesOrFolders = FolderHelpers.CheckForFilesFolders(ItemPath);
 		}
-
-		private bool CheckElevationRights()
-		{
-			return IsShortcut
-				? ElevationHelpers.IsElevationRequired(((ShortcutItem)this).TargetPath)
-				: ElevationHelpers.IsElevationRequired(this.ItemPath);
-		}
 	}
 
-	public class RecycleBinItem : ListedItem
+	public sealed class RecycleBinItem : ListedItem
 	{
 		public RecycleBinItem(string folderRelativeId) : base(folderRelativeId)
 		{
@@ -436,7 +472,7 @@ namespace Files.App.Utils
 		public string ItemOriginalFolderName => Path.GetFileName(ItemOriginalFolder);
 	}
 
-	public class FtpItem : ListedItem
+	public sealed class FtpItem : ListedItem
 	{
 		public FtpItem(FtpListItem item, string folder) : base(null)
 		{
@@ -466,13 +502,13 @@ namespace Files.App.Utils
 
 		public async Task<IStorageItem> ToStorageItem() => PrimaryItemAttribute switch
 		{
-			StorageItemTypes.File => await new FtpStorageFile(ItemPath, ItemNameRaw, ItemDateCreatedReal).ToStorageFileAsync(),
-			StorageItemTypes.Folder => new FtpStorageFolder(ItemPath, ItemNameRaw, ItemDateCreatedReal),
+			StorageItemTypes.File => await new Utils.Storage.FtpStorageFile(ItemPath, ItemNameRaw, ItemDateCreatedReal).ToStorageFileAsync(),
+			StorageItemTypes.Folder => new Utils.Storage.FtpStorageFolder(ItemPath, ItemNameRaw, ItemDateCreatedReal),
 			_ => throw new InvalidDataException(),
 		};
 	}
 
-	public class ShortcutItem : ListedItem
+	public sealed class ShortcutItem : ListedItem, IShortcutItem
 	{
 		public ShortcutItem(string folderRelativeId) : base(folderRelativeId)
 		{
@@ -491,12 +527,13 @@ namespace Files.App.Utils
 		public string Arguments { get; set; }
 		public string WorkingDirectory { get; set; }
 		public bool RunAsAdmin { get; set; }
+		public SHOW_WINDOW_CMD ShowWindowCommand { get; set; }
 		public bool IsUrl { get; set; }
 		public bool IsSymLink { get; set; }
 		public override bool IsExecutable => FileExtensionHelpers.IsExecutableFile(TargetPath, true);
 	}
 
-	public class ZipItem : ListedItem
+	public sealed class ZipItem : ListedItem
 	{
 		public ZipItem(string folderRelativeId) : base(folderRelativeId)
 		{
@@ -520,7 +557,7 @@ namespace Files.App.Utils
 		{ }
 	}
 
-	public class LibraryItem : ListedItem
+	public sealed class LibraryItem : ListedItem
 	{
 		public LibraryItem(LibraryLocationItem library) : base(null)
 		{
@@ -547,7 +584,7 @@ namespace Files.App.Utils
 		public ReadOnlyCollection<string> Folders { get; }
 	}
 
-	public class AlternateStreamItem : ListedItem
+	public sealed class AlternateStreamItem : ListedItem
 	{
 		public string MainStreamPath => ItemPath.Substring(0, ItemPath.LastIndexOf(':'));
 		public string MainStreamName => Path.GetFileName(MainStreamPath);
@@ -567,7 +604,7 @@ namespace Files.App.Utils
 		}
 	}
 
-	public class GitItem : ListedItem
+	public class GitItem : ListedItem, IGitItem
 	{
 		private volatile int statusPropertiesInitialized = 0;
 		public bool StatusPropertiesInitialized
@@ -642,5 +679,133 @@ namespace Files.App.Utils
 			get => _GitLastCommitFullSha;
 			set => SetProperty(ref _GitLastCommitFullSha, value);
 		}
+	}
+	public sealed class GitShortcutItem : GitItem, IShortcutItem
+	{
+		private volatile int statusPropertiesInitialized = 0;
+		public bool StatusPropertiesInitialized
+		{
+			get => statusPropertiesInitialized == 1;
+			set => Interlocked.Exchange(ref statusPropertiesInitialized, value ? 1 : 0);
+		}
+
+		private volatile int commitPropertiesInitialized = 0;
+		public bool CommitPropertiesInitialized
+		{
+			get => commitPropertiesInitialized == 1;
+			set => Interlocked.Exchange(ref commitPropertiesInitialized, value ? 1 : 0);
+		}
+
+		private Style? _UnmergedGitStatusIcon;
+		public Style? UnmergedGitStatusIcon
+		{
+			get => _UnmergedGitStatusIcon;
+			set => SetProperty(ref _UnmergedGitStatusIcon, value);
+		}
+
+		private string? _UnmergedGitStatusName;
+		public string? UnmergedGitStatusName
+		{
+			get => _UnmergedGitStatusName;
+			set => SetProperty(ref _UnmergedGitStatusName, value);
+		}
+
+		private DateTimeOffset? _GitLastCommitDate;
+		public DateTimeOffset? GitLastCommitDate
+		{
+			get => _GitLastCommitDate;
+			set
+			{
+				SetProperty(ref _GitLastCommitDate, value);
+				GitLastCommitDateHumanized = value is DateTimeOffset dto ? dateTimeFormatter.ToShortLabel(dto) : "";
+			}
+		}
+
+		private string? _GitLastCommitDateHumanized;
+		public string? GitLastCommitDateHumanized
+		{
+			get => _GitLastCommitDateHumanized;
+			set => SetProperty(ref _GitLastCommitDateHumanized, value);
+		}
+
+		private string? _GitLastCommitMessage;
+		public string? GitLastCommitMessage
+		{
+			get => _GitLastCommitMessage;
+			set => SetProperty(ref _GitLastCommitMessage, value);
+		}
+
+		private string? _GitCommitAuthor;
+		public string? GitLastCommitAuthor
+		{
+			get => _GitCommitAuthor;
+			set => SetProperty(ref _GitCommitAuthor, value);
+		}
+
+		private string? _GitLastCommitSha;
+		public string? GitLastCommitSha
+		{
+			get => _GitLastCommitSha;
+			set => SetProperty(ref _GitLastCommitSha, value);
+		}
+
+		private string? _GitLastCommitFullSha;
+		public string? GitLastCommitFullSha
+		{
+			get => _GitLastCommitFullSha;
+			set => SetProperty(ref _GitLastCommitFullSha, value);
+		}
+
+		public string TargetPath { get; set; }
+
+		public override string Name
+			=> IsSymLink ? base.Name : Path.GetFileNameWithoutExtension(ItemNameRaw); // Always hide extension for shortcuts
+
+		public string Arguments { get; set; }
+		public string WorkingDirectory { get; set; }
+		public bool RunAsAdmin { get; set; }
+		public SHOW_WINDOW_CMD ShowWindowCommand { get; set; }
+		public bool IsUrl { get; set; }
+		public bool IsSymLink { get; set; }
+		public override bool IsExecutable => FileExtensionHelpers.IsExecutableFile(TargetPath, true);
+	}
+	public interface IGitItem
+	{
+		public bool StatusPropertiesInitialized { get ; set; }
+		public bool CommitPropertiesInitialized { get; set; }
+
+		public Style? UnmergedGitStatusIcon{ get; set; }
+
+		public string? UnmergedGitStatusName{ get; set; }
+
+		public DateTimeOffset? GitLastCommitDate{ get; set; }
+
+		public string? GitLastCommitDateHumanized{ get; set; }
+
+		public string? GitLastCommitMessage{ get; set; }
+
+		public string? GitLastCommitAuthor{ get; set; }
+
+		public string? GitLastCommitSha{ get; set; }
+
+		public string? GitLastCommitFullSha{ get; set; }
+
+		public string ItemPath
+		{
+			get;
+			set;
+		}
+	}
+	public interface IShortcutItem
+	{
+		public string TargetPath { get; set; }
+		public string Name { get; }
+		public string Arguments { get; set; }
+		public string WorkingDirectory { get; set; }
+		public bool RunAsAdmin { get; set; }
+		public SHOW_WINDOW_CMD ShowWindowCommand { get; set; }
+		public bool IsUrl { get; set; }
+		public bool IsSymLink { get; set; }
+		public bool IsExecutable { get; }
 	}
 }

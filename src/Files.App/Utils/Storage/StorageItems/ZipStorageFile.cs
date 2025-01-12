@@ -1,5 +1,5 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Files.Shared.Helpers;
 using SevenZip;
@@ -9,6 +9,7 @@ using Windows.Foundation;
 using Windows.Storage;
 using Windows.Storage.FileProperties;
 using Windows.Storage.Streams;
+using Windows.Win32;
 using IO = System.IO;
 
 namespace Files.App.Utils.Storage
@@ -104,7 +105,7 @@ namespace Files.App.Utils.Storage
 						return await backingFile.OpenAsync(accessMode);
 					}
 
-					var file = NativeFileOperationsHelper.OpenFileForRead(containerPath, rw);
+					var file = Win32Helper.OpenFileForRead(containerPath, rw);
 					return file.IsInvalid ? null : new FileStream(file, rw ? FileAccess.ReadWrite : FileAccess.Read).AsRandomAccessStream();
 				}
 
@@ -133,7 +134,7 @@ namespace Files.App.Utils.Storage
 				}
 
 				throw new NotSupportedException("Can't open zip file as RW");
-			}, ((IPasswordProtectedItem)this).RetryWithCredentials));
+			}, ((IPasswordProtectedItem)this).RetryWithCredentialsAsync));
 		}
 		public override IAsyncOperation<IRandomAccessStream> OpenAsync(FileAccessMode accessMode, StorageOpenOptions options)
 			=> OpenAsync(accessMode);
@@ -149,7 +150,7 @@ namespace Files.App.Utils.Storage
 						return await backingFile.OpenReadAsync();
 					}
 
-					var hFile = NativeFileOperationsHelper.OpenFileForRead(containerPath);
+					var hFile = Win32Helper.OpenFileForRead(containerPath);
 					return hFile.IsInvalid ? null : new StreamWithContentType(new FileStream(hFile, FileAccess.Read).AsRandomAccessStream());
 				}
 
@@ -174,7 +175,7 @@ namespace Files.App.Utils.Storage
 					DisposeCallback = () => zipFile.Dispose()
 				};
 				return new StreamWithContentType(nsStream);
-			}, ((IPasswordProtectedItem)this).RetryWithCredentials));
+			}, ((IPasswordProtectedItem)this).RetryWithCredentialsAsync));
 		}
 
 		public override IAsyncOperation<IInputStream> OpenSequentialReadAsync()
@@ -188,7 +189,7 @@ namespace Files.App.Utils.Storage
 						return await backingFile.OpenSequentialReadAsync();
 					}
 
-					var hFile = NativeFileOperationsHelper.OpenFileForRead(containerPath);
+					var hFile = Win32Helper.OpenFileForRead(containerPath);
 					return hFile.IsInvalid ? null : new FileStream(hFile, FileAccess.Read).AsInputStream();
 				}
 
@@ -211,7 +212,7 @@ namespace Files.App.Utils.Storage
 				{
 					DisposeCallback = () => zipFile.Dispose()
 				};
-			}, ((IPasswordProtectedItem)this).RetryWithCredentials));
+			}, ((IPasswordProtectedItem)this).RetryWithCredentialsAsync));
 		}
 
 		public override IAsyncOperation<StorageStreamTransaction> OpenTransactedWriteAsync()
@@ -254,18 +255,18 @@ namespace Files.App.Utils.Storage
 				{
 					var destFile = await destFolder.CreateFileAsync(desiredNewName, option.Convert());
 					using var outStream = await destFile.OpenStreamForWriteAsync();
-					await SafetyExtensions.Wrap(() => zipFile.ExtractFileAsync(entry.Index, outStream), async (_, exception) =>
+					await SafetyExtensions.WrapAsync(() => zipFile.ExtractFileAsync(entry.Index, outStream), async (_, exception) =>
 					{
 						await destFile.DeleteAsync();
 						throw exception;
 					});
 					return destFile;
 				}
-			}, ((IPasswordProtectedItem)this).RetryWithCredentials));
+			}, ((IPasswordProtectedItem)this).RetryWithCredentialsAsync));
 		}
 		public override IAsyncAction CopyAndReplaceAsync(IStorageFile fileToReplace)
 		{
-			return AsyncInfo.Run((cancellationToken) => SafetyExtensions.Wrap(async () =>
+			return AsyncInfo.Run((cancellationToken) => SafetyExtensions.WrapAsync(async () =>
 			{
 				using SevenZipExtractor zipFile = await OpenZipFileAsync();
 				if (zipFile is null || zipFile.ArchiveFileData is null)
@@ -284,7 +285,7 @@ namespace Files.App.Utils.Storage
 				{
 					await zipFile.ExtractFileAsync(entry.Index, outStream);
 				}
-			}, ((IPasswordProtectedItem)this).RetryWithCredentials));
+			}, ((IPasswordProtectedItem)this).RetryWithCredentialsAsync));
 		}
 
 		public override IAsyncAction MoveAsync(IStorageFolder destinationFolder)
@@ -299,7 +300,7 @@ namespace Files.App.Utils.Storage
 		public override IAsyncAction RenameAsync(string desiredName) => RenameAsync(desiredName, NameCollisionOption.FailIfExists);
 		public override IAsyncAction RenameAsync(string desiredName, NameCollisionOption option)
 		{
-			return AsyncInfo.Run((cancellationToken) => SafetyExtensions.Wrap(async () =>
+			return AsyncInfo.Run((cancellationToken) => SafetyExtensions.WrapAsync(async () =>
 			{
 				if (Path == containerPath)
 				{
@@ -310,7 +311,7 @@ namespace Files.App.Utils.Storage
 					else
 					{
 						var fileName = IO.Path.Combine(IO.Path.GetDirectoryName(Path), desiredName);
-						NativeFileOperationsHelper.MoveFileFromApp(Path, fileName);
+						PInvoke.MoveFileFromApp(Path, fileName);
 					}
 				}
 				else
@@ -338,13 +339,13 @@ namespace Files.App.Utils.Storage
 						}
 					}
 				}
-			}, ((IPasswordProtectedItem)this).RetryWithCredentials));
+			}, ((IPasswordProtectedItem)this).RetryWithCredentialsAsync));
 		}
 
 		public override IAsyncAction DeleteAsync() => DeleteAsync(StorageDeleteOption.Default);
 		public override IAsyncAction DeleteAsync(StorageDeleteOption option)
 		{
-			return AsyncInfo.Run((cancellationToken) => SafetyExtensions.Wrap(async () =>
+			return AsyncInfo.Run((cancellationToken) => SafetyExtensions.WrapAsync(async () =>
 			{
 				if (Path == containerPath)
 				{
@@ -354,7 +355,7 @@ namespace Files.App.Utils.Storage
 					}
 					else if (option == StorageDeleteOption.PermanentDelete)
 					{
-						NativeFileOperationsHelper.DeleteFileFromApp(Path);
+						PInvoke.DeleteFileFromApp(Path);
 					}
 					else
 					{
@@ -385,7 +386,7 @@ namespace Files.App.Utils.Storage
 						}
 					}
 				}
-			}, ((IPasswordProtectedItem)this).RetryWithCredentials));
+			}, ((IPasswordProtectedItem)this).RetryWithCredentialsAsync));
 		}
 
 		public override IAsyncOperation<StorageItemThumbnail> GetThumbnailAsync(ThumbnailMode mode)
@@ -399,7 +400,7 @@ namespace Files.App.Utils.Storage
 		{
 			try
 			{
-				var hFile = NativeFileOperationsHelper.OpenFileForRead(path);
+				var hFile = Win32Helper.OpenFileForRead(path);
 				if (hFile.IsInvalid)
 				{
 					return false;
@@ -474,7 +475,7 @@ namespace Files.App.Utils.Storage
 				}
 				else
 				{
-					var hFile = NativeFileOperationsHelper.OpenFileForRead(containerPath, readWrite);
+					var hFile = Win32Helper.OpenFileForRead(containerPath, readWrite);
 					if (hFile.IsInvalid)
 					{
 						return null;
@@ -518,7 +519,7 @@ namespace Files.App.Utils.Storage
 			};
 		}
 
-		private class ZipFileBasicProperties : BaseBasicProperties
+		private sealed class ZipFileBasicProperties : BaseBasicProperties
 		{
 			private ArchiveFileInfo entry;
 
@@ -526,7 +527,7 @@ namespace Files.App.Utils.Storage
 
 			public override DateTimeOffset DateModified => entry.LastWriteTime == DateTime.MinValue ? DateTimeOffset.MinValue : entry.LastWriteTime;
 
-			public override DateTimeOffset ItemDate => entry.CreationTime == DateTime.MinValue ? DateTimeOffset.MinValue : entry.CreationTime;
+			public override DateTimeOffset DateCreated => entry.CreationTime == DateTime.MinValue ? DateTimeOffset.MinValue : entry.CreationTime;
 
 			public override ulong Size => entry.Size;
 		}

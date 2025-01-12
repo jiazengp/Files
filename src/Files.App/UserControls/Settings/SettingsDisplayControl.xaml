@@ -1,4 +1,4 @@
-﻿<!--  Copyright (c) 2023 Files Community. Licensed under the MIT License. See the LICENSE.  -->
+﻿<!--  Copyright (c) Files Community. Licensed under the MIT License.  -->
 <UserControl
 	x:Class="Files.App.UserControls.Settings.SettingsDisplayControl"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -45,7 +45,8 @@
 			x:Name="SettingsIconElement"
 			Margin="2,20,20,20"
 			x:Load="{x:Bind Icon, Mode=OneWay, Converter={StaticResource NullToFalseConverter}}"
-			Content="{x:Bind Icon, Mode=OneWay}" />
+			Content="{x:Bind Icon, Mode=OneWay}"
+			Foreground="{ThemeResource App.Theme.IconBaseBrush}" />
 
 		<Grid
 			x:Name="DescriptionPanel"

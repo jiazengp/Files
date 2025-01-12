@@ -1,12 +1,13 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Files.Shared.Helpers;
 using Microsoft.Extensions.Logging;
 using System.IO;
-using System.Text.RegularExpressions;
 using Vanara.PInvoke;
 using Vanara.Windows.Shell;
+using Windows.Win32;
+using Windows.Win32.UI.Shell;
 
 namespace Files.App.Utils.Shell
 {
@@ -15,14 +16,15 @@ namespace Files.App.Utils.Shell
 	/// </summary>
 	public static class LaunchHelper
 	{
-		public static void LaunchSettings(string page)
+		public unsafe static void LaunchSettings(string page)
 		{
-			var appActiveManager = new Shell32.IApplicationActivationManager();
+			using ComPtr<IApplicationActivationManager> pApplicationActivationManager = default;
+			pApplicationActivationManager.CoCreateInstance<Shell32.ApplicationActivationManager>();
 
-			appActiveManager.ActivateApplication(
+			pApplicationActivationManager.Get()->ActivateApplication(
 				"windows.immersivecontrolpanel_cw5n1h2txyewy!microsoft.windows.immersivecontrolpanel",
 				page,
-				Shell32.ACTIVATEOPTIONS.AO_NONE,
+				ACTIVATEOPTIONS.AO_NONE,
 				out _);
 		}
 
@@ -34,19 +36,32 @@ namespace Files.App.Utils.Shell
 		public static Task<bool> RunCompatibilityTroubleshooterAsync(string filePath)
 		{
 			var compatibilityTroubleshooterAnswerFile = Path.Combine(Path.GetTempPath(), "CompatibilityTroubleshooterAnswerFile.xml");
-			File.WriteAllText(compatibilityTroubleshooterAnswerFile, string.Format("<?xml version=\"1.0\" encoding=\"UTF-8\"?><Answers Version=\"1.0\"><Interaction ID=\"IT_LaunchMethod\"><Value>CompatTab</Value></Interaction><Interaction ID=\"IT_BrowseForFile\"><Value>{0}</Value></Interaction></Answers>", filePath));
+
+			try
+			{
+				File.WriteAllText(compatibilityTroubleshooterAnswerFile, string.Format("<?xml version=\"1.0\" encoding=\"UTF-8\"?><Answers Version=\"1.0\"><Interaction ID=\"IT_LaunchMethod\"><Value>CompatTab</Value></Interaction><Interaction ID=\"IT_BrowseForFile\"><Value>{0}</Value></Interaction></Answers>", filePath));
+			}
+			catch (IOException)
+			{
+				// Try with a different file name
+				SafetyExtensions.IgnoreExceptions(() =>
+				{
+					compatibilityTroubleshooterAnswerFile = Path.Combine(Path.GetTempPath(), "CompatibilityTroubleshooterAnswerFile1.xml");
+					File.WriteAllText(compatibilityTroubleshooterAnswerFile, string.Format("<?xml version=\"1.0\" encoding=\"UTF-8\"?><Answers Version=\"1.0\"><Interaction ID=\"IT_LaunchMethod\"><Value>CompatTab</Value></Interaction><Interaction ID=\"IT_BrowseForFile\"><Value>{0}</Value></Interaction></Answers>", filePath));
+				});
+			}
 
 			return HandleApplicationLaunch("MSDT.exe", $"/id PCWDiagnostic /af \"{compatibilityTroubleshooterAnswerFile}\"", "");
 		}
 
 		private static async Task<bool> HandleApplicationLaunch(string application, string arguments, string workingDirectory)
 		{
-			var currentWindows = Win32API.GetDesktopWindows();
+			var currentWindows = Win32Helper.GetDesktopWindows();
 
 			if (FileExtensionHelpers.IsVhdFile(application))
 			{
 				// Use PowerShell to mount Vhd Disk as this requires admin rights
-				return await Win32API.MountVhdDisk(application);
+				return await Win32Helper.MountVhdDisk(application);
 			}
 
 			try
@@ -85,9 +100,6 @@ namespace Files.App.Utils.Shell
 					process.StartInfo.Arguments = arguments;
 
 					// Refresh env variables for the child process
-					foreach (DictionaryEntry ent in Environment.GetEnvironmentVariables(EnvironmentVariableTarget.Machine))
-						process.StartInfo.EnvironmentVariables[(string)ent.Key] = (string)ent.Value;
-
 					foreach (DictionaryEntry ent in Environment.GetEnvironmentVariables(EnvironmentVariableTarget.User))
 						process.StartInfo.EnvironmentVariables[(string)ent.Key] = (string)ent.Value;
 
@@ -96,10 +108,10 @@ namespace Files.App.Utils.Shell
 						Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User));
 				}
 
-				process.StartInfo.WorkingDirectory = workingDirectory;
+				process.StartInfo.WorkingDirectory = string.IsNullOrEmpty(workingDirectory) ? PathNormalization.GetParentDir(application) : workingDirectory;
 				process.Start();
 
-				Win32API.BringToForeground(currentWindows);
+				Win32Helper.BringToForeground(currentWindows);
 
 				return true;
 			}
@@ -110,35 +122,40 @@ namespace Files.App.Utils.Shell
 				process.StartInfo.FileName = application;
 				process.StartInfo.CreateNoWindow = true;
 				process.StartInfo.Arguments = arguments;
-				process.StartInfo.WorkingDirectory = workingDirectory;
+				process.StartInfo.WorkingDirectory = string.IsNullOrEmpty(workingDirectory) ? PathNormalization.GetParentDir(application) : workingDirectory;
 
 				try
 				{
 					process.Start();
 
-					Win32API.BringToForeground(currentWindows);
+					Win32Helper.BringToForeground(currentWindows);
 
 					return true;
+				}
+				catch (Win32Exception ex) when (ex.NativeErrorCode == 50)
+				{
+					// ShellExecute return code 50 (ERROR_NOT_SUPPORTED) for some exes (#15179)
+					return Win32Helper.RunPowershellCommand($"\"{application}\"", PowerShellExecutionOptions.Hidden);
 				}
 				catch (Win32Exception)
 				{
 					try
 					{
-						var opened = await Win32API.StartSTATask(async () =>
+						var opened = await Win32Helper.StartSTATask(async () =>
 						{
 							var split = application.Split('|').Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => GetMtpPath(x));
 							if (split.Count() == 1)
 							{
 								Process.Start(split.First());
 
-								Win32API.BringToForeground(currentWindows);
+								Win32Helper.BringToForeground(currentWindows);
 							}
 							else
 							{
 								var groups = split.GroupBy(x => new
 								{
 									Dir = Path.GetDirectoryName(x),
-									Prog = Win32API.GetFileAssociationAsync(x).Result ?? Path.GetExtension(x)
+									Prog = Win32Helper.GetFileAssociationAsync(x).Result ?? Path.GetExtension(x)
 								});
 
 								foreach (var group in groups)
@@ -146,7 +163,7 @@ namespace Files.App.Utils.Shell
 									if (!group.Any())
 										continue;
 
-									using var cMenu = await ContextMenu.GetContextMenuForFiles(group.ToArray(), Shell32.CMF.CMF_DEFAULTONLY);
+									using var cMenu = await ContextMenu.GetContextMenuForFiles(group.ToArray(), PInvoke.CMF_DEFAULTONLY);
 
 									if (cMenu is not null)
 										await cMenu.InvokeVerb(Shell32.CMDSTR_OPEN);
@@ -160,9 +177,9 @@ namespace Files.App.Utils.Shell
 						{
 							if (application.StartsWith(@"\\SHELL\", StringComparison.Ordinal))
 							{
-								opened = await Win32API.StartSTATask(async () =>
+								opened = await Win32Helper.StartSTATask(async () =>
 								{
-									using var cMenu = await ContextMenu.GetContextMenuForFiles(new[] { application }, Shell32.CMF.CMF_DEFAULTONLY);
+									using var cMenu = await ContextMenu.GetContextMenuForFiles(new[] { application }, PInvoke.CMF_DEFAULTONLY);
 
 									if (cMenu is not null)
 										await cMenu.InvokeItem(cMenu.Items.FirstOrDefault()?.ID ?? -1);
@@ -174,7 +191,7 @@ namespace Files.App.Utils.Shell
 
 						if (!opened)
 						{
-							var isAlternateStream = Regex.IsMatch(application, @"\w:\w");
+							var isAlternateStream = RegexHelpers.AlternateStream().IsMatch(application);
 							if (isAlternateStream)
 							{
 								var basePath = Path.Combine(Environment.GetEnvironmentVariable("TEMP"), Guid.NewGuid().ToString("n"));
@@ -233,7 +250,7 @@ namespace Files.App.Utils.Shell
 				using var computer = new ShellFolder(Shell32.KNOWNFOLDERID.FOLDERID_ComputerFolder);
 				using var device = computer.FirstOrDefault(i => executable.Replace("\\\\?\\", "", StringComparison.Ordinal).StartsWith(i.Name, StringComparison.Ordinal));
 				var deviceId = device?.ParsingName;
-				var itemPath = Regex.Replace(executable, @"^\\\\\?\\[^\\]*\\?", "");
+				var itemPath = RegexHelpers.WindowsPath().Replace(executable, "");
 				return deviceId is not null ? Path.Combine(deviceId, itemPath) : executable;
 			}
 

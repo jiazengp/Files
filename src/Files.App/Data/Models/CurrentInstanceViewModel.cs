@@ -1,25 +1,25 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Data.Models
 {
-	public class CurrentInstanceViewModel : ObservableObject
+	public sealed class CurrentInstanceViewModel : ObservableObject
 	{
 		// TODO:
 		//  In the future, we should consolidate these public variables into
 		//  a single enum property providing simplified customization of the
 		//  values being manipulated inside the setter blocks
 
-		public FolderSettingsViewModel FolderSettings { get; }
+		public LayoutPreferencesManager FolderSettings { get; }
 
 		public CurrentInstanceViewModel()
 		{
-			FolderSettings = new FolderSettingsViewModel();
+			FolderSettings = new LayoutPreferencesManager();
 		}
 
 		public CurrentInstanceViewModel(FolderLayoutModes rootLayoutMode)
 		{
-			FolderSettings = new FolderSettingsViewModel(rootLayoutMode);
+			FolderSettings = new LayoutPreferencesManager(rootLayoutMode);
 		}
 
 		private bool isPageTypeSearchResults = false;
@@ -31,7 +31,6 @@ namespace Files.App.Data.Models
 				SetProperty(ref isPageTypeSearchResults, value);
 				OnPropertyChanged(nameof(CanCreateFileInPage));
 				OnPropertyChanged(nameof(CanCopyPathInPage));
-				OnPropertyChanged(nameof(ShowSearchUnindexedItemsMessage));
 			}
 		}
 
@@ -40,24 +39,6 @@ namespace Files.App.Data.Models
 		{
 			get => currentSearchQuery;
 			set => SetProperty(ref currentSearchQuery, value);
-		}
-
-		private bool searchedUnindexedItems;
-		public bool SearchedUnindexedItems
-		{
-			get => searchedUnindexedItems;
-			set
-			{
-				if (SetProperty(ref searchedUnindexedItems, value))
-				{
-					OnPropertyChanged(nameof(ShowSearchUnindexedItemsMessage));
-				}
-			}
-		}
-
-		public bool ShowSearchUnindexedItemsMessage
-		{
-			get => !SearchedUnindexedItems && IsPageTypeSearchResults;
 		}
 
 		private bool isPageTypeNotHome = false;
@@ -156,7 +137,15 @@ namespace Files.App.Data.Models
 			get => !isPageTypeRecycleBin && !isPageTypeFtp && !isPageTypeZipFolder;
 		}
 
-		public bool IsGitRepository => !string.IsNullOrWhiteSpace(gitRepositoryPath);
+		private bool isGitRepository;
+		public bool IsGitRepository
+		{
+			get => isGitRepository;
+			set
+			{
+				SetProperty(ref isGitRepository, value);
+			}
+		}
 
 		private string? gitRepositoryPath;
 		public string? GitRepositoryPath
@@ -164,28 +153,15 @@ namespace Files.App.Data.Models
 			get => gitRepositoryPath;
 			set
 			{
-				if (SetProperty(ref gitRepositoryPath, value))
-				{
-					OnPropertyChanged(nameof(IsGitRepository));
-					OnPropertyChanged(nameof(GitBranchName));
-				}
+				SetProperty(ref gitRepositoryPath, value);
 			}
 		}
 
+		private string gitBranchName = string.Empty;
 		public string GitBranchName
 		{
-			get
-			{
-				if (IsGitRepository)
-					return GitHelpers.GetRepositoryHeadName(gitRepositoryPath);
-
-				return string.Empty;
-			}
-		}
-
-		public void UpdateCurrentBranchName()
-		{
-			OnPropertyChanged(nameof(GitBranchName));
+			get => gitBranchName;
+			set => SetProperty(ref gitBranchName, value);
 		}
 	}
 }

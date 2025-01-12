@@ -1,9 +1,9 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Actions
 {
-	internal class RedoAction : ObservableObject, IAction
+	internal sealed class RedoAction : ObservableObject, IAction
 	{
 		private readonly IContentPageContext context;
 
@@ -27,7 +27,7 @@ namespace Files.App.Actions
 			context.PropertyChanged += Context_PropertyChanged;
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
 			return context.ShellPage!.StorageHistoryHelpers.TryRedo();
 		}

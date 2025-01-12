@@ -1,4 +1,4 @@
-﻿<!--  Copyright (c) 2023 Files Community. Licensed under the MIT License. See the LICENSE.  -->
+﻿<!--  Copyright (c) Files Community. Licensed under the MIT License.  -->
 <ContentDialog
 	x:Class="Files.App.Dialogs.CreateArchiveDialog"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -14,10 +14,11 @@
 	Closing="ContentDialog_Closing"
 	CornerRadius="{StaticResource OverlayCornerRadius}"
 	DefaultButton="Primary"
+	HighContrastAdjustment="None"
 	IsPrimaryButtonEnabled="{x:Bind ViewModel.IsNameValid, Mode=OneWay}"
 	Loaded="ContentDialog_Loaded"
 	PrimaryButtonText="{helpers:ResourceString Name=Create}"
-	RequestedTheme="{x:Bind helpers:ThemeHelper.RootTheme}"
+	RequestedTheme="{x:Bind RootAppElement.RequestedTheme, Mode=OneWay}"
 	Style="{StaticResource DefaultContentDialogStyle}"
 	mc:Ignorable="d">
 
@@ -73,6 +74,7 @@
 				<ColumnDefinition Width="Auto" />
 			</Grid.ColumnDefinitions>
 			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto" />
 				<RowDefinition Height="Auto" />
 				<RowDefinition Height="Auto" />
 				<RowDefinition Height="Auto" />
@@ -137,6 +139,22 @@
 					</DataTemplate>
 				</ComboBox.ItemTemplate>
 			</ComboBox>
+
+			<!--  CPU Threads  -->
+			<TextBlock
+				Grid.Row="3"
+				Grid.Column="0"
+				VerticalAlignment="Center"
+				Text="{helpers:ResourceString Name=CPUThreads}" />
+			<NumberBox
+				Grid.Row="3"
+				Grid.Column="1"
+				HorizontalAlignment="Right"
+				AutomationProperties.Name="{helpers:ResourceString Name=CPUThreads}"
+				Maximum="{x:Bind ViewModel.CPUThreads, Mode=OneTime}"
+				Minimum="1"
+				SpinButtonPlacementMode="Inline"
+				Value="{x:Bind ViewModel.CPUThreads, Mode=TwoWay}" />
 		</Grid>
 
 		<!--  Encryption Options  -->

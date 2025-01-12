@@ -1,9 +1,5 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
-
-using System;
-using System.Collections.Generic;
-using System.Threading;
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.Core.Storage.StorageEnumeration
 {

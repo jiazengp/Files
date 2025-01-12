@@ -1,12 +1,15 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Files.App.ViewModels.Properties;
 using Files.Shared.Helpers;
+using System.Windows.Input;
+using TagLib;
+using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace Files.App.Data.Models
 {
-	public class SelectedItemsPropertiesViewModel : ObservableObject
+	public sealed class SelectedItemsPropertiesViewModel : ObservableObject
 	{
 		private static readonly IDateTimeFormatter dateTimeFormatter = Ioc.Default.GetRequiredService<IDateTimeFormatter>();
 
@@ -181,8 +184,8 @@ namespace Files.App.Data.Models
 			set => SetProperty(ref isUncompressedItemSizeVisibile, value);
 		}
 
-		private long itemSizeBytes;
-		public long ItemSizeBytes
+		private decimal itemSizeBytes;
+		public decimal ItemSizeBytes
 		{
 			get => itemSizeBytes;
 			set => SetProperty(ref itemSizeBytes, value);
@@ -459,6 +462,41 @@ namespace Files.App.Data.Models
 			get => DriveCapacityValue > 0 ? DriveUsedSpaceValue / (double)DriveCapacityValue * 100 : 0;
 		}
 
+		private bool cleanupVisibility = false;
+		public bool CleanupVisibility
+		{
+			get => cleanupVisibility;
+			set => SetProperty(ref cleanupVisibility, value);
+		}
+
+		private ICommand cleanupDriveCommand;
+		public ICommand CleanupDriveCommand
+		{
+			get => cleanupDriveCommand;
+			set => SetProperty(ref cleanupDriveCommand, value);
+		}
+
+		private bool formatVisibility = false;
+		public bool FormatVisibility
+		{
+			get => formatVisibility;
+			set => SetProperty(ref formatVisibility, value);
+		}
+
+		private ICommand formatDriveCommand;
+		public ICommand FormatDriveCommand
+		{
+			get => formatDriveCommand;
+			set => SetProperty(ref formatDriveCommand, value);
+		}
+
+		private ICommand editAlbumCoverCommand;
+		public ICommand EditAlbumCoverCommand
+		{
+			get => editAlbumCoverCommand;
+			set => SetProperty(ref editAlbumCoverCommand, value);
+		}
+
 		private bool itemAttributesVisibility = true;
 		public bool ItemAttributesVisibility
 		{
@@ -492,7 +530,7 @@ namespace Files.App.Data.Models
 		}
 
 		private bool isSelectedItemImage = false;
-		public bool IsSelectedItemImage
+		public bool IsCompatibleToSetAsWindowsWallpaper
 		{
 			get => isSelectedItemImage;
 			set => SetProperty(ref isSelectedItemImage, value);
@@ -508,7 +546,7 @@ namespace Files.App.Data.Models
 		public void CheckAllFileExtensions(List<string> itemExtensions)
 		{
 			// Checks if all the item extensions are image extensions of some kind.
-			IsSelectedItemImage = itemExtensions.TrueForAll(itemExtension => FileExtensionHelpers.IsImageFile(itemExtension));
+			IsCompatibleToSetAsWindowsWallpaper = itemExtensions.TrueForAll(FileExtensionHelpers.IsCompatibleToSetAsWindowsWallpaper);
 			// Checks if there is only one selected item and if it's a shortcut.
 			IsSelectedItemShortcut = (itemExtensions.Count == 1) && (itemExtensions.TrueForAll(itemExtension => FileExtensionHelpers.IsShortcutFile(itemExtension)));
 		}
@@ -524,7 +562,18 @@ namespace Files.App.Data.Models
 		public string ShortcutItemPath
 		{
 			get => shortcutItemPath;
-			set => SetProperty(ref shortcutItemPath, value);
+			set
+			{
+				SetProperty(ref shortcutItemPath, value);
+				ShortcutItemPathEditedValue = value;
+			}
+		}
+
+		private string shortcutItemPathEditedValue;
+		public string ShortcutItemPathEditedValue
+		{
+			get => shortcutItemPathEditedValue;
+			set => SetProperty(ref shortcutItemPathEditedValue, value);
 		}
 
 		private bool isShortcutItemPathReadOnly;
@@ -538,7 +587,18 @@ namespace Files.App.Data.Models
 		public string ShortcutItemWorkingDir
 		{
 			get => shortcutItemWorkingDir;
-			set => SetProperty(ref shortcutItemWorkingDir, value);
+			set
+			{
+				SetProperty(ref shortcutItemWorkingDir, value);
+				ShortcutItemWorkingDirEditedValue = value;
+			}
+		}
+
+		private string shortcutItemWorkingDirEditedValue;
+		public string ShortcutItemWorkingDirEditedValue
+		{
+			get => shortcutItemWorkingDirEditedValue;
+			set => SetProperty(ref shortcutItemWorkingDirEditedValue, value);
 		}
 
 		private bool shortcutItemWorkingDirVisibility = false;
@@ -555,6 +615,17 @@ namespace Files.App.Data.Models
 			set
 			{
 				SetProperty(ref shortcutItemArguments, value);
+				ShortcutItemArgumentsEditedValue = value;
+			}
+		}
+
+		private string shortcutItemArgumentsEditedValue;
+		public string ShortcutItemArgumentsEditedValue
+		{
+			get => shortcutItemArgumentsEditedValue;
+			set
+			{
+				SetProperty(ref shortcutItemArgumentsEditedValue, value);
 			}
 		}
 
@@ -564,12 +635,12 @@ namespace Files.App.Data.Models
 			get => shortcutItemArgumentsVisibility;
 			set => SetProperty(ref shortcutItemArgumentsVisibility, value);
 		}
-
-		private bool loadLinkIcon;
-		public bool LoadLinkIcon
+		
+		private bool shortcutItemWindowArgsVisibility = false;
+		public bool ShortcutItemWindowArgsVisibility
 		{
-			get => loadLinkIcon;
-			set => SetProperty(ref loadLinkIcon, value);
+			get => shortcutItemWindowArgsVisibility;
+			set => SetProperty(ref shortcutItemWindowArgsVisibility, value);
 		}
 
 		private RelayCommand shortcutItemOpenLinkCommand;
@@ -592,28 +663,40 @@ namespace Files.App.Data.Models
 			}
 		}
 
-		private ObservableCollection<FilePropertySection> propertySections = new();
+		private ObservableCollection<FilePropertySection> propertySections = [];
 		public ObservableCollection<FilePropertySection> PropertySections
 		{
 			get => propertySections;
 			set => SetProperty(ref propertySections, value);
 		}
 
-		private ObservableCollection<FileProperty> fileProperties = new();
+		private ObservableCollection<FileProperty> fileProperties = [];
 		public ObservableCollection<FileProperty> FileProperties
 		{
 			get => fileProperties;
 			set => SetProperty(ref fileProperties, value);
 		}
 
-		private bool isReadOnly;
-		public bool IsReadOnly
+		private bool? isReadOnly;
+		public bool? IsReadOnly
 		{
 			get => isReadOnly;
 			set
 			{
 				IsReadOnlyEnabled = true;
 				SetProperty(ref isReadOnly, value);
+				IsReadOnlyEditedValue = value;
+			}
+		}
+
+		private bool? isReadOnlyEditedValue;
+		public bool? IsReadOnlyEditedValue
+		{
+			get => isReadOnlyEditedValue;
+			set
+			{
+				IsReadOnlyEnabled = true;
+				SetProperty(ref isReadOnlyEditedValue, value);
 			}
 		}
 
@@ -624,11 +707,56 @@ namespace Files.App.Data.Models
 			set => SetProperty(ref isReadOnlyEnabled, value);
 		}
 
-		private bool isHidden;
-		public bool IsHidden
+		private bool? isHidden;
+		public bool? IsHidden
 		{
 			get => isHidden;
-			set => SetProperty(ref isHidden, value);
+			set
+			{
+				SetProperty(ref isHidden, value);
+				IsHiddenEditedValue = value;
+			}
+		}
+
+		private bool? isHiddenEditedValue;
+		public bool? IsHiddenEditedValue
+		{
+			get => isHiddenEditedValue;
+			set => SetProperty(ref isHiddenEditedValue, value);
+		}
+
+		private bool? isContentCompressed;
+		/// <remarks>
+		/// Applies to NTFS item compression.
+		/// </remarks>
+		public bool? IsContentCompressed
+		{
+			get => isContentCompressed;
+			set
+			{
+				SetProperty(ref isContentCompressed, value);
+				IsContentCompressedEditedValue = value;
+			}
+		}
+
+		private bool? isContentCompressedEditedValue;
+		/// <remarks>
+		/// Applies to NTFS item compression.
+		/// </remarks>
+		public bool? IsContentCompressedEditedValue
+		{
+			get => isContentCompressedEditedValue;
+			set => SetProperty(ref isContentCompressedEditedValue, value);
+		}
+
+		private bool canCompressContent;
+		/// <remarks>
+		/// Applies to NTFS item compression.
+		/// </remarks>
+		public bool CanCompressContent
+		{
+			get => canCompressContent;
+			set => SetProperty(ref canCompressContent, value);
 		}
 
 		private bool runAsAdmin;
@@ -639,6 +767,18 @@ namespace Files.App.Data.Models
 			{
 				RunAsAdminEnabled = true;
 				SetProperty(ref runAsAdmin, value);
+				RunAsAdminEditedValue = value;
+			}
+		}
+
+		private bool runAsAdminEditedValue;
+		public bool RunAsAdminEditedValue
+		{
+			get => runAsAdminEditedValue;
+			set
+			{
+				RunAsAdminEnabled = true;
+				SetProperty(ref runAsAdminEditedValue, value);
 			}
 		}
 
@@ -649,11 +789,96 @@ namespace Files.App.Data.Models
 			set => SetProperty(ref runAsAdminEnabled, value);
 		}
 
+		private static readonly IReadOnlyDictionary<SHOW_WINDOW_CMD, string> showWindowCommandTypes = new Dictionary<SHOW_WINDOW_CMD, string>
+		{
+			{ SHOW_WINDOW_CMD.SW_NORMAL, Strings.NormalWindow.GetLocalizedResource() },
+			{ SHOW_WINDOW_CMD.SW_SHOWMINNOACTIVE, Strings.Minimized.GetLocalizedResource() },
+			{ SHOW_WINDOW_CMD.SW_MAXIMIZE, Strings.Maximized.GetLocalizedResource() }
+		}.AsReadOnly();
+
+		/// <summary>
+		/// The available show window command types.
+		/// </summary>
+		public IReadOnlyDictionary<SHOW_WINDOW_CMD, string> ShowWindowCommandTypes { get => showWindowCommandTypes; }
+
+		/// <summary>
+		/// The localized string of the currently selected ShowWindowCommand.
+		/// This value can be used for display in the UI.
+		/// </summary>
+		public string SelectedShowWindowCommand
+		{
+			get => ShowWindowCommandTypes.GetValueOrDefault(ShowWindowCommandEditedValue)!;
+			set => ShowWindowCommandEditedValue = ShowWindowCommandTypes.First(e => e.Value == value).Key;
+		}
+
+		private SHOW_WINDOW_CMD showWindowCommand;
+		/// <summary>
+		/// The current <see cref="SHOW_WINDOW_CMD"/> property of the item.
+		/// </summary>
+		public SHOW_WINDOW_CMD ShowWindowCommand
+		{
+			get => showWindowCommand;
+			set
+			{
+				if (SetProperty(ref showWindowCommand, value))
+					ShowWindowCommandEditedValue = value;
+			}
+		}
+
+		private SHOW_WINDOW_CMD showWindowCommandEditedValue;
+		/// <summary>
+		/// The edited <see cref="SHOW_WINDOW_CMD"/> property of the item.
+		/// </summary>
+		public SHOW_WINDOW_CMD ShowWindowCommandEditedValue
+		{
+			get => showWindowCommandEditedValue;
+			set
+			{
+				if (SetProperty(ref showWindowCommandEditedValue, value))
+					OnPropertyChanged(nameof(SelectedShowWindowCommand));
+			}
+		}
+
 		private bool isPropertiesLoaded;
 		public bool IsPropertiesLoaded
 		{
 			get => isPropertiesLoaded;
 			set => SetProperty(ref isPropertiesLoaded, value);
+		}
+
+		private bool isDownloadedFile;
+		public bool IsDownloadedFile
+		{
+			get => isDownloadedFile;
+			set => SetProperty(ref isDownloadedFile, value);
+		}
+
+		private bool isUnblockFileSelected;
+		public bool IsUnblockFileSelected
+		{
+			get => isUnblockFileSelected;
+			set => SetProperty(ref isUnblockFileSelected, value);
+		}
+
+		private bool isAblumCoverModified;
+		public bool IsAblumCoverModified
+		{
+			get => isAblumCoverModified;
+			set => SetProperty(ref isAblumCoverModified, value);
+		}
+
+		private bool isEditAlbumCoverVisible;
+		public bool IsEditAlbumCoverVisible
+		{
+			get => isEditAlbumCoverVisible;
+			set => SetProperty(ref isEditAlbumCoverVisible, value);
+		}
+
+		private Picture modifiedAlbumCover;
+		public Picture ModifiedAlbumCover
+		{
+			get => modifiedAlbumCover;
+			set => SetProperty(ref modifiedAlbumCover, value);
 		}
 	}
 }

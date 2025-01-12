@@ -1,11 +1,13 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using System.Drawing;
 using System.Runtime.InteropServices;
 using Vanara.InteropServices;
 using Vanara.PInvoke;
 using Vanara.Windows.Shell;
+using Windows.Win32;
+using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace Files.App.Utils.Shell
 {
@@ -35,15 +37,15 @@ namespace Files.App.Utils.Shell
 			_hMenu = hMenu;
 			_owningThread = owningThread;
 			_itemFilter = itemFilter;
-			_loadSubMenuActions = new();
+			_loadSubMenuActions = [];
 
 			ItemsPath = itemsPath.ToList();
-			Items = new();
+			Items = [];
 		}
 
 		public async static Task<bool> InvokeVerb(string verb, params string[] filePaths)
 		{
-			using var cMenu = await GetContextMenuForFiles(filePaths, Shell32.CMF.CMF_DEFAULTONLY);
+			using var cMenu = await GetContextMenuForFiles(filePaths, PInvoke.CMF_DEFAULTONLY);
 
 			return cMenu is not null && await cMenu.InvokeVerb(verb);
 		}
@@ -53,14 +55,14 @@ namespace Files.App.Utils.Shell
 			if (string.IsNullOrEmpty(verb))
 				return false;
 
-			var item = Items.Where(x => x.CommandString == verb).FirstOrDefault();
+			var item = Items.FirstOrDefault(x => x.CommandString == verb);
 			if (item is not null && item.ID >= 0)
 				// Prefer invocation by ID
 				return await InvokeItem(item.ID);
 
 			try
 			{
-				var currentWindows = Win32API.GetDesktopWindows();
+				var currentWindows = Win32Helper.GetDesktopWindows();
 
 				var pici = new Shell32.CMINVOKECOMMANDINFOEX
 				{
@@ -71,7 +73,7 @@ namespace Files.App.Utils.Shell
 				pici.cbSize = (uint)Marshal.SizeOf(pici);
 
 				await _owningThread.PostMethod(() => _cMenu.InvokeCommand(pici));
-				Win32API.BringToForeground(currentWindows);
+				Win32Helper.BringToForeground(currentWindows);
 
 				return true;
 			}
@@ -90,7 +92,7 @@ namespace Files.App.Utils.Shell
 
 			try
 			{
-				var currentWindows = Win32API.GetDesktopWindows();
+				var currentWindows = Win32Helper.GetDesktopWindows();
 				var pici = new Shell32.CMINVOKECOMMANDINFOEX
 				{
 					lpVerb = Macros.MAKEINTRESOURCE(itemID),
@@ -100,7 +102,7 @@ namespace Files.App.Utils.Shell
 				pici.cbSize = (uint)Marshal.SizeOf(pici);
 
 				await _owningThread.PostMethod(() => _cMenu.InvokeCommand(pici));
-				Win32API.BringToForeground(currentWindows);
+				Win32Helper.BringToForeground(currentWindows);
 
 				return true;
 			}
@@ -112,7 +114,7 @@ namespace Files.App.Utils.Shell
 			return false;
 		}
 
-		public async static Task<ContextMenu?> GetContextMenuForFiles(string[] filePathList, Shell32.CMF flags, Func<string, bool>? itemFilter = null)
+		public async static Task<ContextMenu?> GetContextMenuForFiles(string[] filePathList, uint flags, Func<string, bool>? itemFilter = null)
 		{
 			var owningThread = new ThreadWithMessageQueue();
 
@@ -125,7 +127,7 @@ namespace Files.App.Utils.Shell
 					foreach (var filePathItem in filePathList.Where(x => !string.IsNullOrEmpty(x)))
 						shellItems.Add(ShellFolderExtensions.GetShellItemFromPathOrPIDL(filePathItem));
 
-					return GetContextMenuForFiles(shellItems.ToArray(), flags, owningThread, itemFilter);
+					return GetContextMenuForFiles([.. shellItems], flags, owningThread, itemFilter);
 				}
 				catch
 				{
@@ -140,14 +142,14 @@ namespace Files.App.Utils.Shell
 			});
 		}
 
-		public async static Task<ContextMenu?> GetContextMenuForFiles(ShellItem[] shellItems, Shell32.CMF flags, Func<string, bool>? itemFilter = null)
+		public async static Task<ContextMenu?> GetContextMenuForFiles(ShellItem[] shellItems, uint flags, Func<string, bool>? itemFilter = null)
 		{
 			var owningThread = new ThreadWithMessageQueue();
 
 			return await owningThread.PostMethod<ContextMenu>(() => GetContextMenuForFiles(shellItems, flags, owningThread, itemFilter));
 		}
 
-		private static ContextMenu? GetContextMenuForFiles(ShellItem[] shellItems, Shell32.CMF flags, ThreadWithMessageQueue owningThread, Func<string, bool>? itemFilter = null)
+		private static ContextMenu? GetContextMenuForFiles(ShellItem[] shellItems, uint flags, ThreadWithMessageQueue owningThread, Func<string, bool>? itemFilter = null)
 		{
 			if (!shellItems.Any())
 				return null;
@@ -159,7 +161,7 @@ namespace Files.App.Utils.Shell
 
 				Shell32.IContextMenu menu = sf.GetChildrenUIObjects<Shell32.IContextMenu>(default, shellItems);
 				var hMenu = User32.CreatePopupMenu();
-				menu.QueryContextMenu(hMenu, 0, 1, 0x7FFF, flags);
+				menu.QueryContextMenu(hMenu, 0, 1, 0x7FFF, (Shell32.CMF)flags);
 				var contextMenu = new ContextMenu(menu, hMenu, shellItems.Select(x => x.ParsingName), owningThread, itemFilter);
 				contextMenu.EnumMenuItems(hMenu, contextMenu.Items);
 
@@ -174,10 +176,10 @@ namespace Files.App.Utils.Shell
 
 		public static async Task WarmUpQueryContextMenuAsync()
 		{
-			using var cMenu = await GetContextMenuForFiles(new string[] { "C:\\" }, Shell32.CMF.CMF_NORMAL);
+			using var cMenu = await GetContextMenuForFiles(new string[] { $@"{Constants.UserEnvironmentPaths.SystemDrivePath}\" }, PInvoke.CMF_NORMAL);
 		}
 
-		private void EnumMenuItems(HMENU hMenu, List<Win32ContextMenuItem> menuItemsResult, bool loadSubenus = false)
+		private void EnumMenuItems(Vanara.PInvoke.HMENU hMenu, List<Win32ContextMenuItem> menuItemsResult, bool loadSubenus = false)
 		{
 			var itemCount = User32.GetMenuItemCount(hMenu);
 
@@ -211,12 +213,12 @@ namespace Files.App.Utils.Shell
 					continue;
 				}
 
-				menuItem.Type = (MenuItemType)menuItemInfo.fType;
+				menuItem.Type = (MENU_ITEM_TYPE)menuItemInfo.fType;
 
 				// wID - idCmdFirst
 				menuItem.ID = (int)(menuItemInfo.wID - 1);
 
-				if (menuItem.Type == MenuItemType.MFT_STRING)
+				if (menuItem.Type == MENU_ITEM_TYPE.MFT_STRING)
 				{
 					Debug.WriteLine("Item {0} ({1}): {2}", index, menuItemInfo.wID, menuItemInfo.dwTypeData);
 
@@ -232,16 +234,19 @@ namespace Files.App.Utils.Shell
 
 					if (menuItemInfo.hbmpItem != HBITMAP.NULL && !Enum.IsDefined(typeof(HBITMAP_HMENU), ((IntPtr)menuItemInfo.hbmpItem).ToInt64()))
 					{
-						using var bitmap = Win32API.GetBitmapFromHBitmap(menuItemInfo.hbmpItem);
+						using var bitmap = Win32Helper.GetBitmapFromHBitmap(menuItemInfo.hbmpItem);
 
 						if (bitmap is not null)
 						{
+							// Make the icon background transparent
+							bitmap.MakeTransparent();
+
 							byte[] bitmapData = (byte[])new ImageConverter().ConvertTo(bitmap, typeof(byte[]));
 							menuItem.Icon = bitmapData;
 						}
 					}
 
-					if (menuItemInfo.hSubMenu != HMENU.NULL)
+					if (menuItemInfo.hSubMenu != Vanara.PInvoke.HMENU.NULL)
 					{
 						Debug.WriteLine("Item {0}: has submenu", index);
 						var subItems = new List<Win32ContextMenuItem>();
@@ -261,6 +266,11 @@ namespace Files.App.Utils.Shell
 							try
 							{
 								cMenu2?.HandleMenuMsg((uint)User32.WindowMessage.WM_INITMENUPOPUP, (IntPtr)hSubMenu, new IntPtr(index));
+							}
+							catch (Exception ex) when (ex is InvalidCastException or ArgumentException)
+							{
+								// TODO: Investigate why this exception happen
+								Debug.WriteLine(ex);
 							}
 							catch (Exception ex) when (ex is COMException or NotImplementedException)
 							{
@@ -292,7 +302,7 @@ namespace Files.App.Utils.Shell
 						loadSubMenuAction!();
 						return true;
 					}
-					catch (COMException)
+					catch
 					{
 						return false;
 					}

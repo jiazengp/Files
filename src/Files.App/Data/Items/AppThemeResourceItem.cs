@@ -1,9 +1,9 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Data.Items
 {
-	public class AppThemeResourceItem
+	public sealed class AppThemeResourceItem
 	{
 		public string? Name { get; set; }
 

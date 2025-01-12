@@ -1,15 +1,17 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using CommunityToolkit.WinUI;
 using Microsoft.UI.Xaml;
-using Vanara.PInvoke;
 using Windows.Storage;
+using Windows.Win32.Foundation;
 
 namespace Files.App.ViewModels.Properties
 {
-	public class SecurityViewModel : ObservableObject
+	public sealed class SecurityViewModel : ObservableObject
 	{
+		private readonly IStorageSecurityService StorageSecurityService = Ioc.Default.GetRequiredService<IStorageSecurityService>();
+
 		private readonly PropertiesPageNavigationParameter _navigationParameter;
 
 		private readonly Window _window;
@@ -89,13 +91,13 @@ namespace Files.App.ViewModels.Properties
 					break;
 			};
 
-			var error = FileSecurityHelpers.GetAccessControlList(_path, _isFolder, out _AccessControlList);
+			var error = StorageSecurityService.GetAcl(_path, _isFolder, out _AccessControlList);
 			_SelectedAccessControlEntry = AccessControlList.AccessControlEntries.FirstOrDefault();
 
 			if (!AccessControlList.IsValid)
 			{
 				DisplayElements = false;
-				ErrorMessage = error == Win32Error.ERROR_ACCESS_DENIED
+				ErrorMessage = error is WIN32_ERROR.ERROR_ACCESS_DENIED
 					? "SecurityRequireReadPermissions".GetLocalizedResource() + "\r\n" + "SecurityClickAdvancedPermissions".GetLocalizedResource()
 					: "SecurityUnableToDisplayPermissions".GetLocalizedResource();
 			}
@@ -105,11 +107,11 @@ namespace Files.App.ViewModels.Properties
 				ErrorMessage = string.Empty;
 			}
 
-			AddAccessControlEntryCommand = new AsyncRelayCommand(ExecuteAddAccessControlEntryCommand);
-			RemoveAccessControlEntryCommand = new AsyncRelayCommand(ExecuteRemoveAccessControlEntryCommand);
+			AddAccessControlEntryCommand = new AsyncRelayCommand(ExecuteAddAccessControlEntryCommandAsync);
+			RemoveAccessControlEntryCommand = new AsyncRelayCommand(ExecuteRemoveAccessControlEntryCommandAsync);
 		}
 
-		private async Task ExecuteAddAccessControlEntryCommand()
+		private async Task ExecuteAddAccessControlEntryCommandAsync()
 		{
 			// Pick an user or a group with Object Picker UI
 			var sid = await FileOperationsHelpers.OpenObjectPickerAsync(FilePropertiesHelpers.GetWindowHandle(_window).ToInt64());
@@ -119,15 +121,15 @@ namespace Files.App.ViewModels.Properties
 			await MainWindow.Instance.DispatcherQueue.EnqueueAsync(() =>
 			{
 				// Run Win32API
-				var win32Result = FileSecurityHelpers.AddAccessControlEntry(_path, sid);
+				var win32Result = StorageSecurityService.AddAce(_path, _isFolder, sid);
 
 				// Add a new ACE to the ACL
-				var ace = FileSecurityHelpers.InitializeDefaultAccessControlEntry(_isFolder, sid);
+				var ace = AccessControlEntry.GetDefault(_isFolder, sid);
 				AccessControlList.AccessControlEntries.Insert(0, ace);
 			});
 		}
 
-		private async Task ExecuteRemoveAccessControlEntryCommand()
+		private async Task ExecuteRemoveAccessControlEntryCommandAsync()
 		{
 			await MainWindow.Instance.DispatcherQueue.EnqueueAsync(() =>
 			{
@@ -135,7 +137,7 @@ namespace Files.App.ViewModels.Properties
 				var index = AccessControlList.AccessControlEntries.IndexOf(SelectedAccessControlEntry);
 
 				// Run Win32API
-				var win32Result = FileSecurityHelpers.RemoveAccessControlEntry(_path, (uint)index);
+				var win32Result = StorageSecurityService.DeleteAce(_path, (uint)index);
 
 				// Remove the ACE
 				AccessControlList.AccessControlEntries.Remove(SelectedAccessControlEntry);
