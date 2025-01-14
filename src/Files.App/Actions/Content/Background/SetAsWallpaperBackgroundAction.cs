@@ -1,9 +1,11 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
+
+using Microsoft.Extensions.Logging;
 
 namespace Files.App.Actions
 {
-	internal class SetAsWallpaperBackgroundAction : BaseSetAsAction
+	internal sealed class SetAsWallpaperBackgroundAction : BaseSetAsAction
 	{
 		public override string Label
 			=> "SetAsBackground".GetLocalizedResource();
@@ -16,12 +18,21 @@ namespace Files.App.Actions
 
 		public override bool IsExecutable =>
 			base.IsExecutable &&
-			context.SelectedItem is not null;
+			ContentPageContext.SelectedItem is not null;
 
-		public override Task ExecuteAsync()
+		public override Task ExecuteAsync(object? parameter = null)
 		{
-			if (context.SelectedItem is not null)
-				WallpaperHelpers.SetAsBackground(WallpaperType.Desktop, context.SelectedItem.ItemPath);
+			if (!IsExecutable || ContentPageContext.SelectedItem is not ListedItem selectedItem)
+				return Task.CompletedTask;
+
+			try
+			{
+				WindowsWallpaperService.SetDesktopWallpaper(selectedItem.ItemPath);
+			}
+			catch (Exception ex)
+			{
+				ShowErrorDialog(ex.Message);
+			}
 
 			return Task.CompletedTask;
 		}

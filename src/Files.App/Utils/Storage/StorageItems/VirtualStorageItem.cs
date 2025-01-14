@@ -1,12 +1,12 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using System.IO;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Foundation;
 using Windows.Storage;
 using Windows.Storage.FileProperties;
-using static Files.Core.Helpers.NativeFindStorageItemHelper;
+using static Files.App.Helpers.Win32Helper;
 
 namespace Files.App.Utils.Storage
 {
@@ -15,7 +15,7 @@ namespace Files.App.Utils.Storage
 	/// representing a standard filesystem item. As such, VirtualStorageItem does not support hidden,
 	/// shortcut, or link items.
 	/// </summary>
-	public class VirtualStorageItem : IStorageItem
+	public sealed class VirtualStorageItem : IStorageItem
 	{
 		private static BasicProperties props;
 
@@ -42,14 +42,14 @@ namespace Files.App.Utils.Storage
 
 		public static VirtualStorageItem FromPath(string path)
 		{
-			FINDEX_INFO_LEVELS findInfoLevel = FINDEX_INFO_LEVELS.FindExInfoBasic;
-			int additionalFlags = FIND_FIRST_EX_LARGE_FETCH;
-			IntPtr hFile = FindFirstFileExFromApp(path, findInfoLevel, out WIN32_FIND_DATA findData, FINDEX_SEARCH_OPS.FindExSearchNameMatch, IntPtr.Zero, additionalFlags);
+			Win32PInvoke.FINDEX_INFO_LEVELS findInfoLevel = Win32PInvoke.FINDEX_INFO_LEVELS.FindExInfoBasic;
+			int additionalFlags = Win32PInvoke.FIND_FIRST_EX_LARGE_FETCH;
+			IntPtr hFile = Win32PInvoke.FindFirstFileExFromApp(path, findInfoLevel, out Win32PInvoke.WIN32_FIND_DATA findData, Win32PInvoke.FINDEX_SEARCH_OPS.FindExSearchNameMatch, IntPtr.Zero, additionalFlags);
 			if (hFile.ToInt64() != -1)
 			{
 				// https://learn.microsoft.com/openspecs/windows_protocols/ms-fscc/c8e77b37-3909-4fe6-a4ea-2b9d423b1ee4
 				bool isReparsePoint = ((System.IO.FileAttributes)findData.dwFileAttributes & System.IO.FileAttributes.ReparsePoint) == System.IO.FileAttributes.ReparsePoint;
-				bool isSymlink = isReparsePoint && findData.dwReserved0 == NativeFileOperationsHelper.IO_REPARSE_TAG_SYMLINK;
+				bool isSymlink = isReparsePoint && findData.dwReserved0 == Win32PInvoke.IO_REPARSE_TAG_SYMLINK;
 				bool isHidden = ((System.IO.FileAttributes)findData.dwFileAttributes & System.IO.FileAttributes.Hidden) == System.IO.FileAttributes.Hidden;
 				bool isDirectory = ((System.IO.FileAttributes)findData.dwFileAttributes & System.IO.FileAttributes.Directory) == System.IO.FileAttributes.Directory;
 
@@ -59,7 +59,7 @@ namespace Files.App.Utils.Storage
 
 					try
 					{
-						FileTimeToSystemTime(ref findData.ftCreationTime, out SYSTEMTIME systemCreatedDateOutput);
+						Win32PInvoke.FileTimeToSystemTime(ref findData.ftCreationTime, out Win32PInvoke.SYSTEMTIME systemCreatedDateOutput);
 						itemCreatedDate = systemCreatedDateOutput.ToDateTime();
 					}
 					catch (ArgumentException)
@@ -77,13 +77,13 @@ namespace Files.App.Utils.Storage
 					};
 				}
 
-				FindClose(hFile);
+				Win32PInvoke.FindClose(hFile);
 			}
 
 			return null;
 		}
 
-		private async void StreamedFileWriter(StreamedFileDataRequest request)
+		private async void StreamedFileWriterAsync(StreamedFileDataRequest request)
 		{
 			try
 			{
@@ -125,7 +125,7 @@ namespace Files.App.Utils.Storage
 			{
 				async Task<BasicProperties> GetFakeBasicProperties()
 				{
-					var streamedFile = await StorageFile.CreateStreamedFileAsync(Name, StreamedFileWriter, null);
+					var streamedFile = await StorageFile.CreateStreamedFileAsync(Name, StreamedFileWriterAsync, null);
 					return await streamedFile.GetBasicPropertiesAsync();
 				}
 				return props ?? (props = await GetFakeBasicProperties());

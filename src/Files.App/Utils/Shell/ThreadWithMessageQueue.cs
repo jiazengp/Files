@@ -1,11 +1,11 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using System.Collections.Concurrent;
 
 namespace Files.App.Utils.Shell
 {
-	public class ThreadWithMessageQueue : Disposable
+	public sealed class ThreadWithMessageQueue : Disposable
 	{
 		private readonly BlockingCollection<Internal> messageQueue;
 
@@ -58,7 +58,7 @@ namespace Files.App.Utils.Shell
 			thread.Start();
 		}
 
-		private class Internal
+		private sealed class Internal
 		{
 			public Func<object?> payload;
 

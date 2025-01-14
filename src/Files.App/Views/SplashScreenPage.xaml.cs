@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -11,6 +11,14 @@ namespace Files.App.Views
 	/// </summary>
 	public sealed partial class SplashScreenPage : Page
 	{
+		private string BranchLabel =>
+			AppLifecycleHelper.AppEnvironment switch
+			{
+				AppEnvironment.Dev => "Dev",
+				AppEnvironment.SideloadPreview or AppEnvironment.StorePreview => "Preview",
+				_ => string.Empty,
+			};
+
 		public SplashScreenPage()
 		{
 			InitializeComponent();

@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using FluentFTP;
 using SevenZip;
@@ -14,7 +14,7 @@ namespace Files.App.Utils.Storage
 
 		Func<IPasswordProtectedItem, Task<StorageCredential>> PasswordRequestedCallback { get; set; }
 
-		async Task<TOut> RetryWithCredentials<TOut>(Func<Task<TOut>> func, Exception exception)
+		async Task<TOut> RetryWithCredentialsAsync<TOut>(Func<Task<TOut>> func, Exception exception)
 		{
 			var handled = exception is SevenZipOpenFailedException szofex && szofex.Result is OperationResult.WrongPassword ||
 				exception is ExtractionFailedException efex && efex.Result is OperationResult.WrongPassword ||
@@ -28,7 +28,7 @@ namespace Files.App.Utils.Storage
 			return await func();
 		}
 
-		async Task RetryWithCredentials(Func<Task> func, Exception exception)
+		async Task RetryWithCredentialsAsync(Func<Task> func, Exception exception)
 		{
 			var handled = exception is SevenZipOpenFailedException szofex && szofex.Result is OperationResult.WrongPassword ||
 				exception is ExtractionFailedException efex && efex.Result is OperationResult.WrongPassword ||

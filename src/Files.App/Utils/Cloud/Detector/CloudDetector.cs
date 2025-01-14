@@ -1,14 +1,14 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
-using Files.Core.Utils.Cloud;
+using Files.App.Utils.Cloud;
 
 namespace Files.App.Utils.Cloud
 {
 	/// <summary>
 	/// Provides an utility for cloud detection.
 	/// </summary>
-	public class CloudDetector : ICloudDetector
+	public sealed class CloudDetector : ICloudDetector
 	{
 		public async Task<IEnumerable<ICloudProvider>> DetectCloudProvidersAsync()
 		{
@@ -33,6 +33,7 @@ namespace Files.App.Utils.Cloud
 			yield return new BoxCloudDetector();
 			yield return new GenericCloudDetector();
 			yield return new SynologyDriveCloudDetector();
+			yield return new LucidLinkCloudDetector();
 		}
 	}
 }

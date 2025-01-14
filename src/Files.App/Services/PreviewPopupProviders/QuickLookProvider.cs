@@ -1,15 +1,15 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
-using Files.Core.Services;
 using Microsoft.Extensions.Logging;
 using System.IO;
 using System.IO.Pipes;
 using System.Security.Principal;
+using System.Text;
 
 namespace Files.App.Services.PreviewPopupProviders
 {
-	public class QuickLookProvider : IPreviewPopupProvider
+	public sealed class QuickLookProvider : IPreviewPopupProvider
 	{
 		public static QuickLookProvider Instance { get; } = new();
 
@@ -18,17 +18,17 @@ namespace Files.App.Services.PreviewPopupProviders
 		private static string pipeMessageSwitch = "QuickLook.App.PipeMessages.Switch";
 		private static string pipeMessageToggle = "QuickLook.App.PipeMessages.Toggle";
 
-		public async Task TogglePreviewPopup(string path)
+		public async Task TogglePreviewPopupAsync(string path)
 		{
-			await DoPreview(path, pipeMessageToggle);
+			await DoPreviewAsync(path, pipeMessageToggle);
 		}
 
-		public async Task SwitchPreview(string path)
+		public async Task SwitchPreviewAsync(string path)
 		{
-			await DoPreview(path, pipeMessageSwitch);
+			await DoPreviewAsync(path, pipeMessageSwitch);
 		}
 
-		private async Task DoPreview(string path, string message)
+		private async Task DoPreviewAsync(string path, string message)
 		{
 			string pipeName = $"QuickLook.App.Pipe.{WindowsIdentity.GetCurrent().User?.Value}";
 
@@ -41,9 +41,9 @@ namespace Files.App.Services.PreviewPopupProviders
 				await writer.WriteLineAsync($"{message}|{path}");
 				await writer.FlushAsync();
 			}
-			catch (TimeoutException)
+			catch (Exception ex) when (ex is TimeoutException or IOException or EncoderFallbackException)
 			{
-				client.Close();
+				// ignore
 			}
 		}
 
@@ -63,9 +63,8 @@ namespace Files.App.Services.PreviewPopupProviders
 
 					return serverInstances;
 				}
-				catch (TimeoutException)
+				catch (Exception ex) when (ex is TimeoutException or IOException)
 				{
-					client.Close();
 					return 0;
 				}
 			}

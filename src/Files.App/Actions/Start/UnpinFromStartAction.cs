@@ -1,10 +1,14 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Actions
 {
-	internal class UnpinFromStartAction : IAction
+	internal sealed class UnpinFromStartAction : IAction
 	{
+		private IStorageService StorageService { get; } = Ioc.Default.GetRequiredService<IStorageService>();
+
+		private IStartMenuService StartMenuService { get; } = Ioc.Default.GetRequiredService<IStartMenuService>();
+
 		public IContentPageContext context;
 
 		public string Label
@@ -14,23 +18,39 @@ namespace Files.App.Actions
 			=> "UnpinFromStartDescription".GetLocalizedResource();
 
 		public RichGlyph Glyph
-			=> new(opacityStyle: "ColorIconUnpinFromFavorites");
+			=> new(themedIconStyle: "App.ThemedIcons.FavoritePinRemove");
 
 		public UnpinFromStartAction()
 		{
 			context = Ioc.Default.GetRequiredService<IContentPageContext>();
 		}
 
-		public async Task ExecuteAsync()
+		public async Task ExecuteAsync(object? parameter = null)
 		{
 			if (context.SelectedItems.Count > 0)
 			{
 				foreach (ListedItem listedItem in context.ShellPage?.SlimContentPage.SelectedItems)
-					await App.SecondaryTileHelper.UnpinFromStartAsync(listedItem.ItemPath);
+				{
+					await SafetyExtensions.IgnoreExceptions(async () =>
+					{
+						IStorable storable = listedItem.IsFolder switch
+						{
+							true => await StorageService.GetFolderAsync(listedItem.ItemPath),
+							_ => await StorageService.GetFileAsync((listedItem as ShortcutItem)?.TargetPath ?? listedItem.ItemPath)
+						};
+						await StartMenuService.UnpinAsync(storable);
+					});
+				}
 			}
 			else
 			{
-				await App.SecondaryTileHelper.UnpinFromStartAsync(context.ShellPage?.FilesystemViewModel.CurrentFolder.ItemPath);
+				await SafetyExtensions.IgnoreExceptions(async () =>
+				{
+					var currentFolder = context.ShellPage.ShellViewModel.CurrentFolder;
+					var folder = await StorageService.GetFolderAsync(currentFolder.ItemPath);
+
+					await StartMenuService.UnpinAsync(folder);
+				});
 			}
 		}
 	}

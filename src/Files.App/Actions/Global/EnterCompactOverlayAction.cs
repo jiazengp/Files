@@ -1,12 +1,12 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Microsoft.UI.Windowing;
 using Windows.Graphics;
 
 namespace Files.App.Actions
 {
-	internal class EnterCompactOverlayAction : ObservableObject, IAction
+	internal sealed class EnterCompactOverlayAction : ObservableObject, IAction
 	{
 		private readonly IWindowContext windowContext;
 
@@ -14,10 +14,10 @@ namespace Files.App.Actions
 			=> "EnterCompactOverlay".GetLocalizedResource();
 
 		public RichGlyph Glyph
-			=> new(opacityStyle: "ColorIconEnterCompactOverlay");
+			=> new(themedIconStyle: "App.ThemedIcons.CompactOverlay");
 
 		public HotKey HotKey
-			=> new(Keys.Up, KeyModifiers.MenuCtrl);
+			=> new(Keys.Up, KeyModifiers.CtrlAlt);
 
 		public string Description
 			=> "EnterCompactOverlayDescription".GetLocalizedResource();
@@ -32,7 +32,7 @@ namespace Files.App.Actions
 			windowContext.PropertyChanged += WindowContext_PropertyChanged;
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
 			var appWindow = MainWindow.Instance.AppWindow;
 			appWindow.SetPresenter(AppWindowPresenterKind.CompactOverlay);

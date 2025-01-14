@@ -1,12 +1,12 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Actions
 {
 	internal sealed class CompressIntoZipAction : BaseCompressArchiveAction
 	{
 		public override string Label
-			=> string.Format("CreateNamedArchive".GetLocalizedResource(), $"{ArchiveHelpers.DetermineArchiveNameFromSelection(context.SelectedItems)}.zip");
+			=> string.Format("CreateNamedArchive".GetLocalizedResource(), $"{StorageArchiveService.GenerateArchiveNameFromItems(context.SelectedItems)}.zip");
 
 		public override string Description
 			=> "CompressIntoZipDescription".GetLocalizedResource();
@@ -15,19 +15,21 @@ namespace Files.App.Actions
 		{
 		}
 
-		public override Task ExecuteAsync()
+		public override Task ExecuteAsync(object? parameter = null)
 		{
-			var (sources, directory, fileName) = ArchiveHelpers.GetCompressDestination(context.ShellPage);
+			if (context.ShellPage is null)
+				return Task.CompletedTask;
 
-			IArchiveCreator creator = new ArchiveCreator
-			{
-				Sources = sources,
-				Directory = directory,
-				FileName = fileName,
-				FileFormat = ArchiveFormats.Zip,
-			};
+			GetDestination(out var sources, out var directory, out var fileName);
 
-			return ArchiveHelpers.CompressArchiveAsync(creator);
+			ICompressArchiveModel compressionModel = new CompressArchiveModel(
+				sources,
+				directory,
+				fileName,
+				Environment.ProcessorCount,
+				fileFormat: ArchiveFormats.Zip);
+
+			return StorageArchiveService.CompressAsync(compressionModel);
 		}
 	}
 }

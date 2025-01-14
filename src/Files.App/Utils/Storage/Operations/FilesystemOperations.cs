@@ -1,31 +1,35 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Files.Shared.Helpers;
 using Microsoft.UI.Xaml.Controls;
 using System.IO;
 using System.Text;
+using Windows.Foundation.Metadata;
 using Windows.Storage;
+using Windows.Win32;
 
 namespace Files.App.Utils.Storage
 {
 	/// <summary>
 	/// Provides group of file system operation for given page instance.
 	/// </summary>
-	public class FilesystemOperations : IFilesystemOperations
+	public sealed class FilesystemOperations : IFilesystemOperations
 	{
+		private readonly IStorageTrashBinService StorageTrashBinService = Ioc.Default.GetRequiredService<IStorageTrashBinService>();
+
 		private IShellPage _associatedInstance;
 
 		public FilesystemOperations(IShellPage associatedInstance)
 		{
-			this._associatedInstance = associatedInstance;
+			_associatedInstance = associatedInstance;
 		}
 
-		public async Task<(IStorageHistory, IStorageItem)> CreateAsync(IStorageItemWithPath source, IProgress<FileSystemProgress> progress, CancellationToken cancellationToken, bool asAdmin = false)
+		public async Task<(IStorageHistory, IStorageItem)> CreateAsync(IStorageItemWithPath source, IProgress<StatusCenterItemProgressModel> progress, CancellationToken cancellationToken, bool asAdmin = false)
 		{
 			IStorageItemWithPath item = null;
 			FilesystemResult fsResult = (FilesystemResult)false;
-			FileSystemProgress fsProgress = new(progress, true, FileSystemStatusCode.InProgress, 1);
+			StatusCenterItemProgressModel fsProgress = new(progress, true, FileSystemStatusCode.InProgress, 1);
 			fsProgress.Report();
 
 			try
@@ -37,7 +41,7 @@ namespace Files.App.Utils.Storage
 							var newEntryInfo = await ShellNewEntryExtensions.GetNewContextMenuEntryForType(Path.GetExtension(source.Path));
 							if (newEntryInfo is null)
 							{
-								var fsFolderResult = await _associatedInstance.FilesystemViewModel.GetFolderFromPathAsync(PathNormalization.GetParentDir(source.Path));
+								var fsFolderResult = await _associatedInstance.ShellViewModel.GetFolderFromPathAsync(PathNormalization.GetParentDir(source.Path));
 								fsResult = fsFolderResult;
 								if (fsResult)
 								{
@@ -69,7 +73,7 @@ namespace Files.App.Utils.Storage
 
 					case FilesystemItemType.Directory:
 						{
-							var fsFolderResult = await _associatedInstance.FilesystemViewModel.GetFolderFromPathAsync(PathNormalization.GetParentDir(source.Path));
+							var fsFolderResult = await _associatedInstance.ShellViewModel.GetFolderFromPathAsync(PathNormalization.GetParentDir(source.Path));
 							fsResult = fsFolderResult;
 							if (fsResult)
 							{
@@ -89,7 +93,7 @@ namespace Files.App.Utils.Storage
 						break;
 				}
 
-				fsProgress.ProcessedItemsCount = 1;
+				fsProgress.AddProcessedItemsCount(1);
 				fsProgress.ReportStatus(fsResult);
 				return item is not null
 					? (new StorageHistory(FileOperationType.CreateNew, item.CreateList(), null), item.Item)
@@ -102,14 +106,18 @@ namespace Files.App.Utils.Storage
 			}
 		}
 
-		public Task<IStorageHistory> CopyAsync(IStorageItem source, string destination, NameCollisionOption collision, IProgress<FileSystemProgress> progress, CancellationToken cancellationToken)
+		public Task<IStorageHistory> CopyAsync(IStorageItem source, string destination, NameCollisionOption collision, IProgress<StatusCenterItemProgressModel> progress, CancellationToken cancellationToken)
 		{
 			return CopyAsync(source.FromStorageItem(), destination, collision, progress, cancellationToken);
 		}
 
-		public async Task<IStorageHistory> CopyAsync(IStorageItemWithPath source, string destination, NameCollisionOption collision, IProgress<FileSystemProgress> progress, CancellationToken cancellationToken)
+		public async Task<IStorageHistory> CopyAsync(IStorageItemWithPath source, string destination, NameCollisionOption collision, IProgress<StatusCenterItemProgressModel> progress, CancellationToken cancellationToken)
 		{
-			FileSystemProgress fsProgress = new(progress, true, FileSystemStatusCode.InProgress);
+			StatusCenterItemProgressModel fsProgress = new(
+				progress,
+				true,
+				FileSystemStatusCode.InProgress);
+
 			fsProgress.Report();
 
 			if (destination.StartsWith(Constants.UserEnvironmentPaths.RecycleBinPath, StringComparison.Ordinal))
@@ -125,7 +133,6 @@ namespace Files.App.Utils.Storage
 			}
 
 			IStorageItem copiedItem = null;
-			//long itemSize = await FilesystemHelpers.GetItemSize(await source.ToStorageItem(associatedInstance));
 
 			if (source.ItemType == FilesystemItemType.Directory)
 			{
@@ -143,6 +150,9 @@ namespace Files.App.Utils.Storage
 						CloseButtonText = "Cancel".GetLocalizedResource()
 					};
 
+					if (ApiInformation.IsApiContractPresent("Windows.Foundation.UniversalApiContract", 8))
+						dialog.XamlRoot = MainWindow.Instance.Content.XamlRoot;
+
 					ContentDialogResult result = await dialog.TryShowAsync();
 
 					if (result == ContentDialogResult.Primary)
@@ -156,7 +166,7 @@ namespace Files.App.Utils.Storage
 				{
 					// CopyFileFromApp only works on file not directories
 					var fsSourceFolder = await source.ToStorageItemResult();
-					var fsDestinationFolder = await _associatedInstance.FilesystemViewModel.GetFolderFromPathAsync(PathNormalization.GetParentDir(destination));
+					var fsDestinationFolder = await _associatedInstance.ShellViewModel.GetFolderFromPathAsync(PathNormalization.GetParentDir(destination));
 					var fsResult = (FilesystemResult)(fsSourceFolder.ErrorCode | fsDestinationFolder.ErrorCode);
 
 					if (fsResult)
@@ -178,10 +188,10 @@ namespace Files.App.Utils.Storage
 
 						if (fsCopyResult)
 						{
-							if (NativeFileOperationsHelper.HasFileAttribute(source.Path, SystemIO.FileAttributes.Hidden))
+							if (Win32Helper.HasFileAttribute(source.Path, SystemIO.FileAttributes.Hidden))
 							{
 								// The source folder was hidden, apply hidden attribute to destination
-								NativeFileOperationsHelper.SetFileAttribute(fsCopyResult.Result.Path, SystemIO.FileAttributes.Hidden);
+								Win32Helper.SetFileAttribute(fsCopyResult.Result.Path, SystemIO.FileAttributes.Hidden);
 							}
 
 							copiedItem = (BaseStorageFolder)fsCopyResult;
@@ -203,13 +213,13 @@ namespace Files.App.Utils.Storage
 			}
 			else if (source.ItemType == FilesystemItemType.File)
 			{
-				var fsResult = (FilesystemResult)await Task.Run(() => NativeFileOperationsHelper.CopyFileFromApp(source.Path, destination, true));
+				var fsResult = (FilesystemResult)await Task.Run(() => PInvoke.CopyFileFromApp(source.Path, destination, true));
 
 				if (!fsResult)
 				{
 					Debug.WriteLine(System.Runtime.InteropServices.Marshal.GetLastWin32Error());
 
-					FilesystemResult<BaseStorageFolder> destinationResult = await _associatedInstance.FilesystemViewModel.GetFolderFromPathAsync(PathNormalization.GetParentDir(destination));
+					FilesystemResult<BaseStorageFolder> destinationResult = await _associatedInstance.ShellViewModel.GetFolderFromPathAsync(PathNormalization.GetParentDir(destination));
 					var sourceResult = await source.ToStorageItemResult();
 					fsResult = sourceResult.ErrorCode | destinationResult.ErrorCode;
 
@@ -282,14 +292,18 @@ namespace Files.App.Utils.Storage
 			return new StorageHistory(FileOperationType.Copy, source, pathWithType);
 		}
 
-		public Task<IStorageHistory> MoveAsync(IStorageItem source, string destination, NameCollisionOption collision, IProgress<FileSystemProgress> progress, CancellationToken cancellationToken)
+		public Task<IStorageHistory> MoveAsync(IStorageItem source, string destination, NameCollisionOption collision, IProgress<StatusCenterItemProgressModel> progress, CancellationToken cancellationToken)
 		{
 			return MoveAsync(source.FromStorageItem(), destination, collision, progress, cancellationToken);
 		}
 
-		public async Task<IStorageHistory> MoveAsync(IStorageItemWithPath source, string destination, NameCollisionOption collision, IProgress<FileSystemProgress> progress, CancellationToken cancellationToken)
+		public async Task<IStorageHistory> MoveAsync(IStorageItemWithPath source, string destination, NameCollisionOption collision, IProgress<StatusCenterItemProgressModel> progress, CancellationToken cancellationToken)
 		{
-			FileSystemProgress fsProgress = new(progress, true, FileSystemStatusCode.InProgress);
+			StatusCenterItemProgressModel fsProgress = new(
+				progress,
+				true,
+				FileSystemStatusCode.InProgress);
+
 			fsProgress.Report();
 
 			if (source.Path == destination)
@@ -321,8 +335,6 @@ namespace Files.App.Utils.Storage
 
 			IStorageItem movedItem = null;
 
-			//long itemSize = await FilesystemHelpers.GetItemSize(await source.ToStorageItem(associatedInstance));
-
 			if (source.ItemType == FilesystemItemType.Directory)
 			{
 				// Also check if user tried to move anything above the source.ItemPath
@@ -340,6 +352,9 @@ namespace Files.App.Utils.Storage
 						CloseButtonText = "Cancel".GetLocalizedResource()
 					};
 
+					if (ApiInformation.IsApiContractPresent("Windows.Foundation.UniversalApiContract", 8))
+						dialog.XamlRoot = MainWindow.Instance.Content.XamlRoot;
+
 					ContentDialogResult result = await dialog.TryShowAsync();
 
 					if (result == ContentDialogResult.Primary)
@@ -351,14 +366,14 @@ namespace Files.App.Utils.Storage
 				}
 				else
 				{
-					var fsResult = (FilesystemResult)await Task.Run(() => NativeFileOperationsHelper.MoveFileFromApp(source.Path, destination));
+					var fsResult = (FilesystemResult)await Task.Run(() => PInvoke.MoveFileFromApp(source.Path, destination));
 
 					if (!fsResult)
 					{
 						Debug.WriteLine(System.Runtime.InteropServices.Marshal.GetLastWin32Error());
 
 						var fsSourceFolder = await source.ToStorageItemResult();
-						var fsDestinationFolder = await _associatedInstance.FilesystemViewModel.GetFolderFromPathAsync(PathNormalization.GetParentDir(destination));
+						var fsDestinationFolder = await _associatedInstance.ShellViewModel.GetFolderFromPathAsync(PathNormalization.GetParentDir(destination));
 						fsResult = fsSourceFolder.ErrorCode | fsDestinationFolder.ErrorCode;
 
 						if (fsResult)
@@ -366,12 +381,17 @@ namespace Files.App.Utils.Storage
 							if (fsSourceFolder.Result is IPasswordProtectedItem ppis)
 								ppis.PasswordRequestedCallback = UIFilesystemHelpers.RequestPassword;
 
-							// Moving folders using Storage API can result in data loss, copy instead
-							//var fsResultMove = await FilesystemTasks.Wrap(() => MoveDirectoryAsync((BaseStorageFolder)fsSourceFolder, (BaseStorageFolder)fsDestinationFolder, fsSourceFolder.Result.Name, collision.Convert(), true));
-							var fsResultMove = new FilesystemResult<BaseStorageFolder>(null, FileSystemStatusCode.Generic);
+							var srcFolder = (BaseStorageFolder)fsSourceFolder;
+							var fsResultMove = await FilesystemTasks.Wrap(() => srcFolder.MoveAsync(fsDestinationFolder.Result, collision).AsTask());
 
-							if (await DialogDisplayHelper.ShowDialogAsync("ErrorDialogThisActionCannotBeDone".GetLocalizedResource(), "ErrorDialogUnsupportedMoveOperation".GetLocalizedResource(), "OK", "Cancel".GetLocalizedResource()))
-								fsResultMove = await FilesystemTasks.Wrap(() => CloneDirectoryAsync((BaseStorageFolder)fsSourceFolder, (BaseStorageFolder)fsDestinationFolder, fsSourceFolder.Result.Name, collision.Convert()));
+							if (!fsResultMove) // Use generic move folder operation (move folder items one by one)
+							{
+								// Moving folders using Storage API can result in data loss, copy instead
+								//var fsResultMove = await FilesystemTasks.Wrap(() => MoveDirectoryAsync((BaseStorageFolder)fsSourceFolder, (BaseStorageFolder)fsDestinationFolder, fsSourceFolder.Result.Name, collision.Convert(), true));
+
+								if (await DialogDisplayHelper.ShowDialogAsync("ErrorDialogThisActionCannotBeDone".GetLocalizedResource(), "ErrorDialogUnsupportedMoveOperation".GetLocalizedResource(), "OK", "Cancel".GetLocalizedResource()))
+									fsResultMove = await FilesystemTasks.Wrap(() => CloneDirectoryAsync((BaseStorageFolder)fsSourceFolder, (BaseStorageFolder)fsDestinationFolder, fsSourceFolder.Result.Name, collision.Convert()));
+							}
 
 							if (fsSourceFolder.Result is IPasswordProtectedItem ppiu)
 								ppiu.PasswordRequestedCallback = null;
@@ -385,10 +405,10 @@ namespace Files.App.Utils.Storage
 
 							if (fsResultMove)
 							{
-								if (NativeFileOperationsHelper.HasFileAttribute(source.Path, SystemIO.FileAttributes.Hidden))
+								if (Win32Helper.HasFileAttribute(source.Path, SystemIO.FileAttributes.Hidden))
 								{
 									// The source folder was hidden, apply hidden attribute to destination
-									NativeFileOperationsHelper.SetFileAttribute(fsResultMove.Result.Path, SystemIO.FileAttributes.Hidden);
+									Win32Helper.SetFileAttribute(fsResultMove.Result.Path, SystemIO.FileAttributes.Hidden);
 								}
 
 								movedItem = (BaseStorageFolder)fsResultMove;
@@ -406,13 +426,13 @@ namespace Files.App.Utils.Storage
 			}
 			else if (source.ItemType == FilesystemItemType.File)
 			{
-				var fsResult = (FilesystemResult)await Task.Run(() => NativeFileOperationsHelper.MoveFileFromApp(source.Path, destination));
+				var fsResult = (FilesystemResult)await Task.Run(() => PInvoke.MoveFileFromApp(source.Path, destination));
 
 				if (!fsResult)
 				{
 					Debug.WriteLine(System.Runtime.InteropServices.Marshal.GetLastWin32Error());
 
-					FilesystemResult<BaseStorageFolder> destinationResult = await _associatedInstance.FilesystemViewModel.GetFolderFromPathAsync(PathNormalization.GetParentDir(destination));
+					FilesystemResult<BaseStorageFolder> destinationResult = await _associatedInstance.ShellViewModel.GetFolderFromPathAsync(PathNormalization.GetParentDir(destination));
 					var sourceResult = await source.ToStorageItemResult();
 					fsResult = sourceResult.ErrorCode | destinationResult.ErrorCode;
 
@@ -453,39 +473,51 @@ namespace Files.App.Utils.Storage
 				return null;
 			}
 
+			bool sourceInCurrentFolder = PathNormalization.TrimPath(_associatedInstance.ShellViewModel.CurrentFolder.ItemPath) ==
+				PathNormalization.GetParentDir(source.Path);
+			if (fsProgress.Status == FileSystemStatusCode.Success && sourceInCurrentFolder)
+			{
+				await _associatedInstance.ShellViewModel.RemoveFileOrFolderAsync(source.Path);
+				await _associatedInstance.ShellViewModel.ApplyFilesAndFoldersChangesAsync();
+			}
+
 			var pathWithType = movedItem.FromStorageItem(destination, source.ItemType);
 
 			return new StorageHistory(FileOperationType.Move, source, pathWithType);
 		}
 
-		public Task<IStorageHistory> DeleteAsync(IStorageItem source, IProgress<FileSystemProgress> progress, bool permanently, CancellationToken cancellationToken)
+		public Task<IStorageHistory> DeleteAsync(IStorageItem source, IProgress<StatusCenterItemProgressModel> progress, bool permanently, CancellationToken cancellationToken)
 		{
 			return DeleteAsync(source.FromStorageItem(), progress, permanently, cancellationToken);
 		}
 
-		public async Task<IStorageHistory> DeleteAsync(IStorageItemWithPath source, IProgress<FileSystemProgress> progress, bool permanently, CancellationToken cancellationToken)
+		public async Task<IStorageHistory> DeleteAsync(IStorageItemWithPath source, IProgress<StatusCenterItemProgressModel> progress, bool permanently, CancellationToken cancellationToken)
 		{
-			FileSystemProgress fsProgress = new(progress, true, FileSystemStatusCode.InProgress);
+			StatusCenterItemProgressModel fsProgress = new(
+				progress,
+				true,
+				FileSystemStatusCode.InProgress);
+
 			fsProgress.Report();
 
-			bool deleteFromRecycleBin = RecycleBinHelpers.IsPathUnderRecycleBin(source.Path);
+			bool deleteFromRecycleBin = StorageTrashBinService.IsUnderTrashBin(source.Path);
 
 			FilesystemResult fsResult = FileSystemStatusCode.InProgress;
 
 			if (permanently)
 			{
-				fsResult = (FilesystemResult)NativeFileOperationsHelper.DeleteFileFromApp(source.Path);
+				fsResult = (FilesystemResult)PInvoke.DeleteFileFromApp(source.Path);
 			}
 			if (!fsResult)
 			{
 				if (source.ItemType == FilesystemItemType.File)
 				{
-					fsResult = await _associatedInstance.FilesystemViewModel.GetFileFromPathAsync(source.Path)
+					fsResult = await _associatedInstance.ShellViewModel.GetFileFromPathAsync(source.Path)
 						.OnSuccess((t) => t.DeleteAsync(permanently ? StorageDeleteOption.PermanentDelete : StorageDeleteOption.Default).AsTask());
 				}
 				else if (source.ItemType == FilesystemItemType.Directory)
 				{
-					fsResult = await _associatedInstance.FilesystemViewModel.GetFolderFromPathAsync(source.Path)
+					fsResult = await _associatedInstance.ShellViewModel.GetFolderFromPathAsync(source.Path)
 						.OnSuccess((t) => t.DeleteAsync(permanently ? StorageDeleteOption.PermanentDelete : StorageDeleteOption.Default).AsTask());
 				}
 			}
@@ -507,19 +539,19 @@ namespace Files.App.Utils.Storage
 				// Recycle bin also stores a file starting with $I for each item
 				string iFilePath = Path.Combine(Path.GetDirectoryName(source.Path), Path.GetFileName(source.Path).Replace("$R", "$I", StringComparison.Ordinal));
 
-				await _associatedInstance.FilesystemViewModel.GetFileFromPathAsync(iFilePath)
+				await _associatedInstance.ShellViewModel.GetFileFromPathAsync(iFilePath)
 					.OnSuccess(iFile => iFile.DeleteAsync(StorageDeleteOption.PermanentDelete).AsTask());
 			}
 			fsProgress.ReportStatus(fsResult);
 
 			if (fsResult)
 			{
-				await _associatedInstance.FilesystemViewModel.RemoveFileOrFolderAsync(source.Path);
+				await _associatedInstance.ShellViewModel.RemoveFileOrFolderAsync(source.Path);
 
 				if (!permanently)
 				{
 					// Enumerate Recycle Bin
-					IEnumerable<ShellFileItem> nameMatchItems, items = await RecycleBinHelpers.EnumerateRecycleBin();
+					IEnumerable<ShellFileItem> nameMatchItems, items = await StorageTrashBinService.GetAllRecycleBinFoldersAsync();
 
 					// Get name matching files
 					if (FileExtensionHelpers.IsShortcutOrUrlFile(source.Path)) // We need to check if it is a shortcut file
@@ -542,19 +574,20 @@ namespace Files.App.Utils.Storage
 			}
 		}
 
-		public Task<IStorageHistory> RenameAsync(IStorageItem source, string newName, NameCollisionOption collision, IProgress<FileSystemProgress> progress, CancellationToken cancellationToken)
+		public Task<IStorageHistory> RenameAsync(IStorageItem source, string newName, NameCollisionOption collision, IProgress<StatusCenterItemProgressModel> progress, CancellationToken cancellationToken)
 		{
 			return RenameAsync(StorageHelpers.FromStorageItem(source), newName, collision, progress, cancellationToken);
 		}
 
-		public async Task<IStorageHistory> RenameAsync(IStorageItemWithPath source,
-													   string newName,
-													   NameCollisionOption collision,
-													   IProgress<FileSystemProgress> progress,
-													   CancellationToken cancellationToken,
-													   bool asAdmin = false)
+		public async Task<IStorageHistory> RenameAsync(
+			IStorageItemWithPath source,
+			string newName,
+			NameCollisionOption collision,
+			IProgress<StatusCenterItemProgressModel> progress,
+			CancellationToken cancellationToken,
+			bool asAdmin = false)
 		{
-			FileSystemProgress fsProgress = new(progress, true, FileSystemStatusCode.InProgress);
+			StatusCenterItemProgressModel fsProgress = new(progress, true, FileSystemStatusCode.InProgress);
 
 			fsProgress.Report();
 
@@ -590,7 +623,7 @@ namespace Files.App.Utils.Storage
 				{
 					// Try again with MoveFileFromApp
 					var destination = Path.Combine(Path.GetDirectoryName(source.Path), newName);
-					if (NativeFileOperationsHelper.MoveFileFromApp(source.Path, destination))
+					if (PInvoke.MoveFileFromApp(source.Path, destination))
 					{
 						fsProgress.ReportStatus(FileSystemStatusCode.Success);
 
@@ -647,18 +680,19 @@ namespace Files.App.Utils.Storage
 			return null;
 		}
 
-		public async Task<IStorageHistory> RestoreItemsFromTrashAsync(IList<IStorageItem> source, IList<string> destination, IProgress<FileSystemProgress> progress, CancellationToken cancellationToken)
+		public async Task<IStorageHistory> RestoreItemsFromTrashAsync(IList<IStorageItem> source, IList<string> destination, IProgress<StatusCenterItemProgressModel> progress, CancellationToken cancellationToken)
 		{
 			return await RestoreItemsFromTrashAsync(await source.Select((item) => item.FromStorageItem()).ToListAsync(), destination, progress, cancellationToken);
 		}
 
-		public async Task<IStorageHistory> RestoreItemsFromTrashAsync(IList<IStorageItemWithPath> source,
-																	 IList<string> destination,
-																	 IProgress<FileSystemProgress> progress,
-																	 CancellationToken token,
-																	 bool asAdmin = false)
+		public async Task<IStorageHistory> RestoreItemsFromTrashAsync(
+			IList<IStorageItemWithPath> source,
+			IList<string> destination,
+			IProgress<StatusCenterItemProgressModel> progress,
+			CancellationToken token,
+			bool asAdmin = false)
 		{
-			FileSystemProgress fsProgress = new(progress, true, FileSystemStatusCode.InProgress, source.Count);
+			StatusCenterItemProgressModel fsProgress = new(progress, true, FileSystemStatusCode.InProgress, source.Count);
 			fsProgress.Report();
 
 			var rawStorageHistory = new List<IStorageHistory>();
@@ -670,7 +704,7 @@ namespace Files.App.Utils.Storage
 
 				rawStorageHistory.Add(await RestoreFromTrashAsync(source[i], destination[i], null, token));
 
-				fsProgress.ProcessedItemsCount++;
+				fsProgress.AddProcessedItemsCount(1);
 				fsProgress.Report();
 
 			}
@@ -686,26 +720,26 @@ namespace Files.App.Utils.Storage
 			return null;
 		}
 
-		public Task<IStorageHistory> RestoreFromTrashAsync(IStorageItem source, string destination, IProgress<FileSystemProgress> progress, CancellationToken cancellationToken)
+		public Task<IStorageHistory> RestoreFromTrashAsync(IStorageItem source, string destination, IProgress<StatusCenterItemProgressModel> progress, CancellationToken cancellationToken)
 		{
 			return RestoreFromTrashAsync(source.FromStorageItem(), destination, progress, cancellationToken);
 		}
 
-		public async Task<IStorageHistory> RestoreFromTrashAsync(IStorageItemWithPath source, string destination, IProgress<FileSystemProgress> progress, CancellationToken cancellationToken)
+		public async Task<IStorageHistory> RestoreFromTrashAsync(IStorageItemWithPath source, string destination, IProgress<StatusCenterItemProgressModel> progress, CancellationToken cancellationToken)
 		{
-			FileSystemProgress fsProgress = new(progress, true, FileSystemStatusCode.InProgress);
+			StatusCenterItemProgressModel fsProgress = new(progress, true, FileSystemStatusCode.InProgress);
 			fsProgress.Report();
 
 			FilesystemResult fsResult = FileSystemStatusCode.InProgress;
 
-			fsResult = (FilesystemResult)await Task.Run(() => NativeFileOperationsHelper.MoveFileFromApp(source.Path, destination));
+			fsResult = (FilesystemResult)await Task.Run(() => PInvoke.MoveFileFromApp(source.Path, destination));
 
 			if (!fsResult)
 			{
 				if (source.ItemType == FilesystemItemType.Directory)
 				{
-					FilesystemResult<BaseStorageFolder> sourceFolder = await _associatedInstance.FilesystemViewModel.GetFolderFromPathAsync(source.Path);
-					FilesystemResult<BaseStorageFolder> destinationFolder = await _associatedInstance.FilesystemViewModel.GetFolderFromPathAsync(PathNormalization.GetParentDir(destination));
+					FilesystemResult<BaseStorageFolder> sourceFolder = await _associatedInstance.ShellViewModel.GetFolderFromPathAsync(source.Path);
+					FilesystemResult<BaseStorageFolder> destinationFolder = await _associatedInstance.ShellViewModel.GetFolderFromPathAsync(PathNormalization.GetParentDir(destination));
 
 					fsResult = sourceFolder.ErrorCode | destinationFolder.ErrorCode;
 					fsProgress.ReportStatus(fsResult);
@@ -713,7 +747,6 @@ namespace Files.App.Utils.Storage
 					if (fsResult)
 					{
 						// Moving folders using Storage API can result in data loss, copy instead
-
 						//fsResult = await FilesystemTasks.Wrap(() => MoveDirectoryAsync(sourceFolder.Result, destinationFolder.Result, Path.GetFileName(destination), CreationCollisionOption.FailIfExists, true));
 
 						if (await DialogDisplayHelper.ShowDialogAsync("ErrorDialogThisActionCannotBeDone".GetLocalizedResource(), "ErrorDialogUnsupportedMoveOperation".GetLocalizedResource(), "OK", "Cancel".GetLocalizedResource()))
@@ -726,8 +759,8 @@ namespace Files.App.Utils.Storage
 				}
 				else
 				{
-					FilesystemResult<BaseStorageFile> sourceFile = await _associatedInstance.FilesystemViewModel.GetFileFromPathAsync(source.Path);
-					FilesystemResult<BaseStorageFolder> destinationFolder = await _associatedInstance.FilesystemViewModel.GetFolderFromPathAsync(PathNormalization.GetParentDir(destination));
+					FilesystemResult<BaseStorageFile> sourceFile = await _associatedInstance.ShellViewModel.GetFileFromPathAsync(source.Path);
+					FilesystemResult<BaseStorageFolder> destinationFolder = await _associatedInstance.ShellViewModel.GetFolderFromPathAsync(PathNormalization.GetParentDir(destination));
 
 					fsResult = sourceFile.ErrorCode | destinationFolder.ErrorCode;
 					fsProgress.ReportStatus(fsResult);
@@ -749,7 +782,7 @@ namespace Files.App.Utils.Storage
 				// Recycle bin also stores a file starting with $I for each item
 				string iFilePath = Path.Combine(Path.GetDirectoryName(source.Path), Path.GetFileName(source.Path).Replace("$R", "$I", StringComparison.Ordinal));
 
-				await _associatedInstance.FilesystemViewModel.GetFileFromPathAsync(iFilePath)
+				await _associatedInstance.ShellViewModel.GetFileFromPathAsync(iFilePath)
 					.OnSuccess(iFile => iFile.DeleteAsync(StorageDeleteOption.PermanentDelete).AsTask());
 			}
 
@@ -776,30 +809,36 @@ namespace Files.App.Utils.Storage
 
 		private async static Task<BaseStorageFolder> CloneDirectoryAsync(BaseStorageFolder sourceFolder, BaseStorageFolder destinationFolder, string sourceRootName, CreationCollisionOption collision = CreationCollisionOption.FailIfExists)
 		{
-			BaseStorageFolder createdRoot = await destinationFolder.CreateFolderAsync(sourceRootName, collision);
+			BaseStorageFolder createdRoot;
+			if (collision is CreationCollisionOption.ReplaceExisting)
+				// Dont't delete the contents of the folder
+				createdRoot = await destinationFolder.CreateFolderAsync(sourceRootName, CreationCollisionOption.OpenIfExists);
+			else
+				createdRoot = await destinationFolder.CreateFolderAsync(sourceRootName, collision);
+
 			destinationFolder = createdRoot;
 
 			foreach (BaseStorageFile fileInSourceDir in await sourceFolder.GetFilesAsync())
 			{
-				await fileInSourceDir.CopyAsync(destinationFolder, fileInSourceDir.Name, NameCollisionOption.GenerateUniqueName);
+				await fileInSourceDir.CopyAsync(destinationFolder, fileInSourceDir.Name, collision.ConvertBack());
 			}
 
 			foreach (BaseStorageFolder folderinSourceDir in await sourceFolder.GetFoldersAsync())
 			{
-				await CloneDirectoryAsync(folderinSourceDir, destinationFolder, folderinSourceDir.Name);
+				await CloneDirectoryAsync(folderinSourceDir, destinationFolder, folderinSourceDir.Name, collision);
 			}
 
 			return createdRoot;
 		}
 
-		public async Task<IStorageHistory> CopyItemsAsync(IList<IStorageItem> source, IList<string> destination, IList<FileNameConflictResolveOptionType> collisions, IProgress<FileSystemProgress> progress, CancellationToken cancellationToken)
+		public async Task<IStorageHistory> CopyItemsAsync(IList<IStorageItem> source, IList<string> destination, IList<FileNameConflictResolveOptionType> collisions, IProgress<StatusCenterItemProgressModel> progress, CancellationToken cancellationToken)
 		{
 			return await CopyItemsAsync(await source.Select((item) => item.FromStorageItem()).ToListAsync(), destination, collisions, progress, cancellationToken);
 		}
 
-		public async Task<IStorageHistory> CopyItemsAsync(IList<IStorageItemWithPath> source, IList<string> destination, IList<FileNameConflictResolveOptionType> collisions, IProgress<FileSystemProgress> progress, CancellationToken token, bool asAdmin = false)
+		public async Task<IStorageHistory> CopyItemsAsync(IList<IStorageItemWithPath> source, IList<string> destination, IList<FileNameConflictResolveOptionType> collisions, IProgress<StatusCenterItemProgressModel> progress, CancellationToken token, bool asAdmin = false)
 		{
-			FileSystemProgress fsProgress = new(progress, true, FileSystemStatusCode.InProgress, source.Count);
+			StatusCenterItemProgressModel fsProgress = new(progress, true, FileSystemStatusCode.InProgress, source.Count);
 			fsProgress.Report();
 
 			var rawStorageHistory = new List<IStorageHistory>();
@@ -821,7 +860,7 @@ namespace Files.App.Utils.Storage
 						token));
 				}
 
-				fsProgress.ProcessedItemsCount++;
+				fsProgress.AddProcessedItemsCount(1);
 				fsProgress.Report();
 
 			}
@@ -836,14 +875,14 @@ namespace Files.App.Utils.Storage
 			return null;
 		}
 
-		public async Task<IStorageHistory> MoveItemsAsync(IList<IStorageItem> source, IList<string> destination, IList<FileNameConflictResolveOptionType> collisions, IProgress<FileSystemProgress> progress, CancellationToken cancellationToken)
+		public async Task<IStorageHistory> MoveItemsAsync(IList<IStorageItem> source, IList<string> destination, IList<FileNameConflictResolveOptionType> collisions, IProgress<StatusCenterItemProgressModel> progress, CancellationToken cancellationToken)
 		{
 			return await MoveItemsAsync(await source.Select((item) => item.FromStorageItem()).ToListAsync(), destination, collisions, progress, cancellationToken);
 		}
 
-		public async Task<IStorageHistory> MoveItemsAsync(IList<IStorageItemWithPath> source, IList<string> destination, IList<FileNameConflictResolveOptionType> collisions, IProgress<FileSystemProgress> progress, CancellationToken token, bool asAdmin = false)
+		public async Task<IStorageHistory> MoveItemsAsync(IList<IStorageItemWithPath> source, IList<string> destination, IList<FileNameConflictResolveOptionType> collisions, IProgress<StatusCenterItemProgressModel> progress, CancellationToken token, bool asAdmin = false)
 		{
-			FileSystemProgress fsProgress = new(progress, true, FileSystemStatusCode.InProgress, source.Count);
+			StatusCenterItemProgressModel fsProgress = new(progress, true, FileSystemStatusCode.InProgress, source.Count);
 			fsProgress.Report();
 
 			var rawStorageHistory = new List<IStorageHistory>();
@@ -865,7 +904,7 @@ namespace Files.App.Utils.Storage
 						token));
 				}
 
-				fsProgress.ProcessedItemsCount++;
+				fsProgress.AddProcessedItemsCount(1);
 				fsProgress.Report();
 			}
 
@@ -879,14 +918,14 @@ namespace Files.App.Utils.Storage
 			return null;
 		}
 
-		public async Task<IStorageHistory> DeleteItemsAsync(IList<IStorageItem> source, IProgress<FileSystemProgress> progress, bool permanently, CancellationToken cancellationToken)
+		public async Task<IStorageHistory> DeleteItemsAsync(IList<IStorageItem> source, IProgress<StatusCenterItemProgressModel> progress, bool permanently, CancellationToken cancellationToken)
 		{
 			return await DeleteItemsAsync(await source.Select((item) => item.FromStorageItem()).ToListAsync(), progress, permanently, cancellationToken);
 		}
 
-		public async Task<IStorageHistory> DeleteItemsAsync(IList<IStorageItemWithPath> source, IProgress<FileSystemProgress> progress, bool permanently, CancellationToken token, bool asAdmin = false)
+		public async Task<IStorageHistory> DeleteItemsAsync(IList<IStorageItemWithPath> source, IProgress<StatusCenterItemProgressModel> progress, bool permanently, CancellationToken token, bool asAdmin = false)
 		{
-			FileSystemProgress fsProgress = new(progress, true, FileSystemStatusCode.InProgress, source.Count);
+			StatusCenterItemProgressModel fsProgress = new(progress, true, FileSystemStatusCode.InProgress, source.Count);
 			fsProgress.Report();
 
 			bool originalPermanently = permanently;
@@ -897,10 +936,10 @@ namespace Files.App.Utils.Storage
 				if (token.IsCancellationRequested)
 					break;
 
-				permanently = RecycleBinHelpers.IsPathUnderRecycleBin(source[i].Path) || originalPermanently;
+				permanently = StorageTrashBinService.IsUnderTrashBin(source[i].Path) || originalPermanently;
 
 				rawStorageHistory.Add(await DeleteAsync(source[i], null, permanently, token));
-				fsProgress.ProcessedItemsCount++;
+				fsProgress.AddProcessedItemsCount(1);
 				fsProgress.Report();
 			}
 
@@ -914,7 +953,7 @@ namespace Files.App.Utils.Storage
 			return null;
 		}
 
-		public Task<IStorageHistory> CreateShortcutItemsAsync(IList<IStorageItemWithPath> source, IList<string> destination, IProgress<FileSystemProgress> progress, CancellationToken token)
+		public Task<IStorageHistory> CreateShortcutItemsAsync(IList<IStorageItemWithPath> source, IList<string> destination, IProgress<StatusCenterItemProgressModel> progress, CancellationToken token)
 		{
 			throw new NotImplementedException("Cannot create shortcuts in UWP.");
 		}

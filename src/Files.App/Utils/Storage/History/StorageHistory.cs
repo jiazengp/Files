@@ -1,9 +1,9 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Utils.Storage
 {
-	public class StorageHistory : IStorageHistory
+	public sealed class StorageHistory : IStorageHistory
 	{
 		public FileOperationType OperationType { get; private set; }
 

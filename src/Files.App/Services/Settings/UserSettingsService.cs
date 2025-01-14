@@ -1,10 +1,10 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using CommunityToolkit.Mvvm.DependencyInjection;
 using Files.App.Utils.Serialization;
 using Files.App.Utils.Serialization.Implementation;
-using Files.Core.Services.Settings;
+using Files.App.Services.Settings;
 using Files.Shared.Extensions;
 using System.Collections.Generic;
 using System.IO;
@@ -32,10 +32,10 @@ namespace Files.App.Services.Settings
 			get => GetSettingsService(ref _AppearanceSettingsService);
 		}
 
-		private IPreviewPaneSettingsService _PreviewPaneSettingsService;
-		public IPreviewPaneSettingsService PreviewPaneSettingsService
+		private IInfoPaneSettingsService _InfoPaneSettingsService;
+		public IInfoPaneSettingsService InfoPaneSettingsService
 		{
-			get => GetSettingsService(ref _PreviewPaneSettingsService);
+			get => GetSettingsService(ref _InfoPaneSettingsService);
 		}
 
 		private ILayoutSettingsService _LayoutSettingsService;
@@ -59,19 +59,21 @@ namespace Files.App.Services.Settings
 		public UserSettingsService()
 		{
 			SettingsSerializer = new DefaultSettingsSerializer();
-			JsonSettingsSerializer = new DefaultJsonSettingsSerializer();
-			JsonSettingsDatabase = new CachingJsonSettingsDatabase(SettingsSerializer, JsonSettingsSerializer);
 
 			Initialize(Path.Combine(ApplicationData.Current.LocalFolder.Path, Constants.LocalSettings.SettingsFolderName, Constants.LocalSettings.UserSettingsFileName));
+
+			JsonSettingsSerializer = new DefaultJsonSettingsSerializer();
+			JsonSettingsDatabase = new CachingJsonSettingsDatabase(SettingsSerializer, JsonSettingsSerializer);
 		}
 
 		public override object ExportSettings()
 		{
-			var export = (Dictionary<string, object>)base.ExportSettings();
+			var export = (IDictionary<string, object>)base.ExportSettings();
 
 			// Remove session settings
 			export.Remove(nameof(GeneralSettingsService.LastSessionTabList));
 			export.Remove(nameof(GeneralSettingsService.LastCrashedTabList));
+			export.Remove(nameof(GeneralSettingsService.PathHistoryList));
 
 			return JsonSettingsSerializer.SerializeToJson(export);
 		}
@@ -80,9 +82,9 @@ namespace Files.App.Services.Settings
 		{
 			Dictionary<string, object> settingsImport = import switch
 			{
-				string s => JsonSettingsSerializer?.DeserializeFromJson<Dictionary<string, object>>(s) ?? new(),
+				string s => JsonSettingsSerializer?.DeserializeFromJson<Dictionary<string, object>>(s) ?? [],
 				Dictionary<string, object> d => d,
-				_ => new(),
+				_ => [],
 			};
 
 			if (!settingsImport.IsEmpty() && base.ImportSettings(settingsImport))

@@ -1,10 +1,5 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
-
-using Files.App.Utils.Serialization;
-using Files.Core.Services.Settings;
-using Microsoft.AppCenter.Analytics;
-using System.Collections.Generic;
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Services.Settings
 {
@@ -14,12 +9,6 @@ namespace Files.App.Services.Settings
 		{
 			// Register root
 			RegisterSettingsContext(settingsSharingContext);
-		}
-
-		public bool SearchUnindexedItems
-		{
-			get => Get(false);
-			set => Set(value);
 		}
 
 		public bool OpenSpecificPageOnStartup
@@ -46,9 +35,9 @@ namespace Files.App.Services.Settings
 			set => Set(value);
 		}
 
-		public bool AlwaysOpenNewInstance
+		public bool OpenTabInExistingInstance
 		{
-			get => Get(false);
+			get => Get(true);
 			set => Set(value);
 		}
 
@@ -70,6 +59,12 @@ namespace Files.App.Services.Settings
 			set => Set(value);
 		}
 
+		public List<string> PathHistoryList
+		{
+			get => Get<List<string>>(null);
+			set => Set(value);
+		}
+
 		public DateTimeFormats DateTimeFormat
 		{
 			get => Get(DateTimeFormats.Application);
@@ -77,6 +72,12 @@ namespace Files.App.Services.Settings
 		}
 
 		public bool AlwaysOpenDualPaneInNewTab
+		{
+			get => Get(false);
+			set => Set(value);
+		}
+
+		public bool AlwaysSwitchToNewlyOpenedTab
 		{
 			get => Get(false);
 			set => Set(value);
@@ -95,6 +96,12 @@ namespace Files.App.Services.Settings
 		}
 
 		public bool ShowDrivesWidget
+		{
+			get => Get(true);
+			set => Set(value);
+		}
+
+		public bool ShowNetworkLocationsWidget
 		{
 			get => Get(true);
 			set => Set(value);
@@ -124,13 +131,25 @@ namespace Files.App.Services.Settings
 			set => Set(value);
 		}
 
+		public bool NetworkLocationsWidgetExpanded
+		{
+			get => Get(false);
+			set => Set(value);
+		}
+
 		public bool FileTagsWidgetExpanded
 		{
 			get => Get(true);
 			set => Set(value);
 		}
 
-		public bool ShowFavoritesSection
+		public bool ShowPinnedSection
+		{
+			get => Get(true);
+			set => Set(value);
+		}
+
+		public bool IsPinnedSectionExpanded
 		{
 			get => Get(true);
 			set => Set(value);
@@ -142,9 +161,21 @@ namespace Files.App.Services.Settings
 			set => Set(value);
 		}
 
+		public bool IsLibrarySectionExpanded
+		{
+			get => Get(false);
+			set => Set(value);
+		}
+
 		public bool ShowDrivesSection
 		{
 			get => Get(true);
+			set => Set(value);
+		}
+
+		public bool IsDriveSectionExpanded
+		{
+			get => Get(false);
 			set => Set(value);
 		}
 
@@ -154,9 +185,21 @@ namespace Files.App.Services.Settings
 			set => Set(value);
 		}
 
-		public bool ShowNetworkDrivesSection
+		public bool IsCloudDriveSectionExpanded
+		{
+			get => Get(false);
+			set => Set(value);
+		}
+
+		public bool ShowNetworkSection
 		{
 			get => Get(true);
+			set => Set(value);
+		}
+
+		public bool IsNetworkSectionExpanded
+		{
+			get => Get(false);
 			set => Set(value);
 		}
 
@@ -166,9 +209,21 @@ namespace Files.App.Services.Settings
 			set => Set(value);
 		}
 
+		public bool IsWslSectionExpanded
+		{
+			get => Get(false);
+			set => Set(value);
+
+		}
 		public bool ShowFileTagsSection
 		{
 			get => Get(true);
+			set => Set(value);
+		}
+
+		public bool IsFileTagsSectionExpanded
+		{
+			get => Get(false);
 			set => Set(value);
 		}
 
@@ -181,6 +236,18 @@ namespace Files.App.Services.Settings
 		public bool ShowEditTagsMenu
 		{
 			get => Get(true);
+			set => Set(value);
+		}
+
+		public bool ShowCompressionOptions
+		{
+			get => Get(true);
+			set => Set(value);
+		}
+
+		public bool ShowFlattenOptions
+		{
+			get => Get(false);
 			set => Set(value);
 		}
 
@@ -208,7 +275,41 @@ namespace Files.App.Services.Settings
 			set => Set(value);
 		}
 
+		public bool ShowCopyPath
+		{
+			get => Get(true);
+			set => Set(value);
+		}
+
+		public bool ShowCreateFolderWithSelection
+		{
+			get => Get(true);
+			set => Set(value);
+		}
+
+		public bool ShowCreateAlternateDataStream
+		{
+			get => Get(false);
+			set => Set(value);
+		}
+
+		public bool ShowCreateShortcut
+		{
+			get => Get(true);
+			set => Set(value);
+		}
+
 		public bool LeaveAppRunning
+		{
+#if RELEASE
+			get => Get(true);
+#else
+			get => Get(false);
+#endif
+			set => Set(value);
+		}
+
+		public bool ShowSystemTrayIcon
 		{
 			get => Get(true);
 			set => Set(value);
@@ -220,53 +321,50 @@ namespace Files.App.Services.Settings
 			set => Set((long)value);
 		}
 
+		public ArchiveFormats ArchiveFormatsOption
+		{
+			get => (ArchiveFormats)Get((long)ArchiveFormats.Zip);
+			set => Set((long)value);
+		}
+
+		public ArchiveCompressionLevels ArchiveCompressionLevelsOption
+		{
+			get => (ArchiveCompressionLevels)Get((long)ArchiveCompressionLevels.Normal);
+			set => Set((long)value);
+		}
+
+		public ArchiveSplittingSizes ArchiveSplittingSizesOption
+		{
+			get => (ArchiveSplittingSizes)Get((long)ArchiveSplittingSizes.None);
+			set => Set((long)value);
+		}
+
 		public Dictionary<string, bool> ShowHashesDictionary
 		{
 			get => Get<Dictionary<string, bool>>(null);
 			set => Set(value);
 		}
 
-		public Dictionary<string, string> Actions
+		public string UserId
 		{
-			get => Get<Dictionary<string, string>>(null) ?? new();
+			get => Get(Guid.NewGuid().ToString());
+			set => Set(value);
+		}
+
+		public ShellPaneArrangement ShellPaneArrangementOption
+		{
+			get => (ShellPaneArrangement)Get((long)ShellPaneArrangement.Horizontal);
+			set => Set((long)value);
+		}
+
+		public bool ShowShelfPane
+		{
+			get => Get(false);
 			set => Set(value);
 		}
 
 		protected override void RaiseOnSettingChangedEvent(object sender, SettingChangedEventArgs e)
 		{
-			switch (e.SettingName)
-			{
-				case nameof(SearchUnindexedItems):
-				case nameof(OpenSpecificPageOnStartup):
-				case nameof(ContinueLastSessionOnStartUp):
-				case nameof(OpenNewTabOnStartup):
-				case nameof(AlwaysOpenNewInstance):
-				case nameof(AlwaysOpenDualPaneInNewTab):
-				case nameof(ShowQuickAccessWidget):
-				case nameof(ShowRecentFilesWidget):
-				case nameof(ShowDrivesWidget):
-				case nameof(FoldersWidgetExpanded):
-				case nameof(RecentFilesWidgetExpanded):
-				case nameof(DrivesWidgetExpanded):
-				case nameof(ShowFavoritesSection):
-				case nameof(ShowLibrarySection):
-				case nameof(ShowCloudDrivesSection):
-				case nameof(ShowNetworkDrivesSection):
-				case nameof(ShowWslSection):
-				case nameof(ShowFileTagsSection):
-				case nameof(MoveShellExtensionsToSubMenu):
-				case nameof(ShowEditTagsMenu):
-				case nameof(ShowSendToMenu):
-				case nameof(ShowOpenInNewTab):
-				case nameof(ShowOpenInNewWindow):
-				case nameof(ShowOpenInNewPane):
-				case nameof(LeaveAppRunning):
-				case nameof(ConflictsResolveOption):
-				case nameof(ShowHashesDictionary):
-					Analytics.TrackEvent($"Set {e.SettingName} to {e.NewValue}");
-					break;
-			}
-
 			base.RaiseOnSettingChangedEvent(sender, e);
 		}
 	}

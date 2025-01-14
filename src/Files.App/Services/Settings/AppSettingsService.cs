@@ -1,9 +1,5 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
-
-using Files.App.Utils.Serialization;
-using Files.Core.Services.Settings;
-using Microsoft.AppCenter.Analytics;
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Services.Settings
 {
@@ -21,6 +17,12 @@ namespace Files.App.Services.Settings
 			set => Set(value);
 		}
 
+		public bool ShowBackgroundRunningNotification
+		{
+			get => Get(true);
+			set => Set(value);
+		}
+
 		public bool RestoreTabsOnStartup
 		{
 			get => Get(false);
@@ -29,16 +31,6 @@ namespace Files.App.Services.Settings
 
 		protected override void RaiseOnSettingChangedEvent(object sender, SettingChangedEventArgs e)
 		{
-			switch (e.SettingName)
-			{
-				case nameof(ShowStatusCenterTeachingTip):
-					Analytics.TrackEvent($"Set {e.SettingName} to {e.NewValue}");
-					break;
-				case nameof(RestoreTabsOnStartup):
-					Analytics.TrackEvent($"Set {e.SettingName} to {e.NewValue}");
-					break;
-			}
-
 			base.RaiseOnSettingChangedEvent(sender, e);
 		}
 	}

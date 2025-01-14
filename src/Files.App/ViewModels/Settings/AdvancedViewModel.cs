@@ -1,7 +1,6 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
-using Files.App.Utils.Shell;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 using SevenZip;
@@ -12,13 +11,15 @@ using Windows.ApplicationModel;
 using Windows.Storage;
 using Windows.Storage.Pickers;
 using Windows.System;
+using Windows.Win32.Storage.FileSystem;
 
 namespace Files.App.ViewModels.Settings
 {
-	public class AdvancedViewModel : ObservableObject
+	public sealed class AdvancedViewModel : ObservableObject
 	{
 		private IUserSettingsService UserSettingsService { get; } = Ioc.Default.GetRequiredService<IUserSettingsService>();
-		
+		private ICommonDialogService CommonDialogService { get; } = Ioc.Default.GetRequiredService<ICommonDialogService>();
+
 		private readonly IFileTagsSettingsService fileTagsSettingsService = Ioc.Default.GetRequiredService<IFileTagsSettingsService>();
 
 		public ICommand SetAsDefaultExplorerCommand { get; }
@@ -34,27 +35,27 @@ namespace Files.App.ViewModels.Settings
 			IsSetAsDefaultFileManager = DetectIsSetAsDefaultFileManager();
 			IsSetAsOpenFileDialog = DetectIsSetAsOpenFileDialog();
 
-			SetAsDefaultExplorerCommand = new AsyncRelayCommand(SetAsDefaultExplorer);
-			SetAsOpenFileDialogCommand = new AsyncRelayCommand(SetAsOpenFileDialog);
-			ExportSettingsCommand = new AsyncRelayCommand(ExportSettings);
-			ImportSettingsCommand = new AsyncRelayCommand(ImportSettings);
-			OpenSettingsJsonCommand = new AsyncRelayCommand(OpenSettingsJson);
-			OpenFilesOnWindowsStartupCommand = new AsyncRelayCommand(OpenFilesOnWindowsStartup);
+			SetAsDefaultExplorerCommand = new AsyncRelayCommand(SetAsDefaultExplorerAsync);
+			SetAsOpenFileDialogCommand = new AsyncRelayCommand(SetAsOpenFileDialogAsync);
+			ExportSettingsCommand = new AsyncRelayCommand(ExportSettingsAsync);
+			ImportSettingsCommand = new AsyncRelayCommand(ImportSettingsAsync);
+			OpenSettingsJsonCommand = new AsyncRelayCommand(OpenSettingsJsonAsync);
+			OpenFilesOnWindowsStartupCommand = new AsyncRelayCommand(OpenFilesOnWindowsStartupAsync);
 
-			_ = DetectOpenFilesAtStartup();
+			_ = DetectOpenFilesAtStartupAsync();
 		}
 
-		private async Task OpenSettingsJson()
+		private async Task OpenSettingsJsonAsync()
 		{
-			var settingsJsonPath = await StorageFile.GetFileFromApplicationUriAsync(new Uri("ms-appdata:///local/settings/user_settings.json"));
-
-			if (!await Launcher.LaunchFileAsync(settingsJsonPath))
+			await SafetyExtensions.IgnoreExceptions(async () =>
 			{
-				await ContextMenu.InvokeVerb("open", settingsJsonPath.Path);
-			}
+				var settingsJsonFile = await StorageFile.GetFileFromApplicationUriAsync(new Uri("ms-appdata:///local/settings/user_settings.json"));
+				if (!await Launcher.LaunchFileAsync(settingsJsonFile))
+					await ContextMenu.InvokeVerb("open", settingsJsonFile.Path);
+			});
 		}
 
-		private async Task SetAsDefaultExplorer()
+		private async Task SetAsDefaultExplorerAsync()
 		{
 			// Make sure IsSetAsDefaultFileManager is updated
 			await Task.Yield();
@@ -78,7 +79,7 @@ namespace Files.App.ViewModels.Settings
 			var dataPath = Environment.ExpandEnvironmentVariables("%LocalAppData%\\Files");
 			if (IsSetAsDefaultFileManager)
 			{
-				if (!await Win32API.RunPowershellCommandAsync($"-command \"New-Item -Force -Path '{dataPath}' -ItemType Directory; Copy-Item -Filter *.* -Path '{destFolder}\\*' -Recurse -Force -Destination '{dataPath}'\"", false))
+				if (!await Win32Helper.RunPowershellCommandAsync($"-command \"New-Item -Force -Path '{dataPath}' -ItemType Directory; Copy-Item -Filter *.* -Path '{destFolder}\\*' -Recurse -Force -Destination '{dataPath}'\"", PowerShellExecutionOptions.Hidden))
 				{
 					// Error copying files
 					await DetectResult();
@@ -87,13 +88,14 @@ namespace Files.App.ViewModels.Settings
 			}
 			else
 			{
-				await Win32API.RunPowershellCommandAsync($"-command \"Remove-Item -Path '{dataPath}' -Recurse -Force\"", false);
+				await Win32Helper.RunPowershellCommandAsync($"-command \"Remove-Item -Path '{dataPath}' -Recurse -Force\"", PowerShellExecutionOptions.Hidden);
 			}
 
 			try
 			{
 				using var regProcess = Process.Start(new ProcessStartInfo("regedit.exe", @$"/s ""{Path.Combine(destFolder, IsSetAsDefaultFileManager ? "SetFilesAsDefault.reg" : "UnsetFilesAsDefault.reg")}""") { UseShellExecute = true, Verb = "runas" });
-				await regProcess.WaitForExitAsync();
+				if (regProcess is not null)
+					await regProcess.WaitForExitAsync();
 			}
 			catch
 			{
@@ -109,13 +111,13 @@ namespace Files.App.ViewModels.Settings
 			if (!IsSetAsDefaultFileManager)
 			{
 				IsSetAsOpenFileDialog = false;
-				return SetAsOpenFileDialog();
+				return SetAsOpenFileDialogAsync();
 			}
 
 			return Task.CompletedTask;
 		}
 
-		private async Task SetAsOpenFileDialog()
+		private async Task SetAsOpenFileDialogAsync()
 		{
 			// Make sure IsSetAsDefaultFileManager is updated
 			await Task.Yield();
@@ -135,12 +137,18 @@ namespace Files.App.ViewModels.Settings
 
 			try
 			{
-				using var regProc32 = Process.Start("regsvr32.exe", @$"/s /n {(!IsSetAsOpenFileDialog ? "/u" : "")} /i:user ""{Path.Combine(destFolder, "Files.App.OpenDialog32.dll")}""");
-				await regProc32.WaitForExitAsync();
-				using var regProc64 = Process.Start("regsvr32.exe", @$"/s /n {(!IsSetAsOpenFileDialog ? "/u" : "")} /i:user ""{Path.Combine(destFolder, "Files.App.OpenDialog64.dll")}""");
-				await regProc64.WaitForExitAsync();
-				using var regProcARM64 = Process.Start("regsvr32.exe", @$"/s /n {(!IsSetAsOpenFileDialog ? "/u" : "")} /i:user ""{Path.Combine(destFolder, "Files.App.OpenDialogARM64.dll")}""");
-				await regProcARM64.WaitForExitAsync();
+				using (var regProc = Process.Start("regsvr32.exe", @$"/s /n {(!IsSetAsOpenFileDialog ? "/u" : "")} /i:user ""{Path.Combine(destFolder, "Files.App.OpenDialog32.dll")}"""))
+					await regProc.WaitForExitAsync();
+				using (var regProc = Process.Start("regsvr32.exe", @$"/s /n {(!IsSetAsOpenFileDialog ? "/u" : "")} /i:user ""{Path.Combine(destFolder, "Files.App.OpenDialog64.dll")}"""))
+					await regProc.WaitForExitAsync();
+				using (var regProc = Process.Start("regsvr32.exe", @$"/s /n {(!IsSetAsOpenFileDialog ? "/u" : "")} /i:user ""{Path.Combine(destFolder, "Files.App.OpenDialogARM64.dll")}"""))
+					await regProc.WaitForExitAsync();
+				using (var regProc = Process.Start("regsvr32.exe", @$"/s /n {(!IsSetAsOpenFileDialog ? "/u" : "")} /i:user ""{Path.Combine(destFolder, "Files.App.SaveDialog32.dll")}"""))
+					await regProc.WaitForExitAsync();
+				using (var regProc = Process.Start("regsvr32.exe", @$"/s /n {(!IsSetAsOpenFileDialog ? "/u" : "")} /i:user ""{Path.Combine(destFolder, "Files.App.SaveDialog64.dll")}"""))
+					await regProc.WaitForExitAsync();
+				using (var regProc = Process.Start("regsvr32.exe", @$"/s /n {(!IsSetAsOpenFileDialog ? "/u" : "")} /i:user ""{Path.Combine(destFolder, "Files.App.SaveDialogARM64.dll")}"""))
+					await regProc.WaitForExitAsync();
 			}
 			catch
 			{
@@ -150,93 +158,104 @@ namespace Files.App.ViewModels.Settings
 			IsSetAsOpenFileDialog = DetectIsSetAsOpenFileDialog();
 		}
 
-		private async Task ImportSettings()
+		private async Task ImportSettingsAsync()
 		{
-			FileOpenPicker filePicker = InitializeWithWindow(new FileOpenPicker());
-			filePicker.FileTypeFilter.Add(".zip");
+			string[] extensions = ["ZipFileCapitalized".GetLocalizedResource(), "*.zip"];
+			bool result = CommonDialogService.Open_FileOpenDialog(MainWindow.Instance.WindowHandle, false, extensions, Environment.SpecialFolder.Desktop, out var filePath);
+			if (!result)
+				return;
 
-			StorageFile file = await filePicker.PickSingleFileAsync();
-			if (file is not null)
+			try
 			{
-				try
-				{
-					var zipFolder = await ZipStorageFolder.FromStorageFileAsync(file);
-					if (zipFolder is null)
-						return;
+				var file = await StorageHelpers.ToStorageItem<BaseStorageFile>(filePath);
 
-					var localFolderPath = ApplicationData.Current.LocalFolder.Path;
-					var settingsFolder = await StorageFolder.GetFolderFromPathAsync(Path.Combine(localFolderPath, Constants.LocalSettings.SettingsFolderName));
+				var zipFolder = await ZipStorageFolder.FromStorageFileAsync(file);
+				if (zipFolder is null)
+					return;
 
-					// Import user settings
-					var userSettingsFile = await zipFolder.GetFileAsync(Constants.LocalSettings.UserSettingsFileName);
-					string importSettings = await userSettingsFile.ReadTextAsync();
-					UserSettingsService.ImportSettings(importSettings);
+				var localFolderPath = ApplicationData.Current.LocalFolder.Path;
+				var settingsFolder = await StorageFolder.GetFolderFromPathAsync(Path.Combine(localFolderPath, Constants.LocalSettings.SettingsFolderName));
 
-					// Import file tags list and DB
-					var fileTagsList = await zipFolder.GetFileAsync(Constants.LocalSettings.FileTagSettingsFileName);
-					string importTags = await fileTagsList.ReadTextAsync();
-					fileTagsSettingsService.ImportSettings(importTags);
-					var fileTagsDB = await zipFolder.GetFileAsync(Path.GetFileName(FileTagsHelper.FileTagsDbPath));
-					string importTagsDB = await fileTagsDB.ReadTextAsync();
-					var tagDbInstance = FileTagsHelper.GetDbInstance();
-					tagDbInstance.Import(importTagsDB);
+				// Import user settings
+				var userSettingsFile = await zipFolder.GetFileAsync(Constants.LocalSettings.UserSettingsFileName);
+				string importSettings = await userSettingsFile.ReadTextAsync();
+				UserSettingsService.ImportSettings(importSettings);
 
-					// Import layout preferences and DB
-					var layoutPrefsDB = await zipFolder.GetFileAsync(Path.GetFileName(FolderSettingsViewModel.LayoutSettingsDbPath));
-					string importPrefsDB = await layoutPrefsDB.ReadTextAsync();
-					var layoutDbInstance = FolderSettingsViewModel.GetDbInstance();
-					layoutDbInstance.Import(importPrefsDB);
-				}
-				catch (Exception ex)
-				{
-					App.Logger.LogWarning(ex, "Error importing settings");
-					UIHelpers.CloseAllDialogs();
-					await DialogDisplayHelper.ShowDialogAsync("SettingsImportErrorTitle".GetLocalizedResource(), "SettingsImportErrorDescription".GetLocalizedResource());
-				}
+				// Import file tags list and DB
+				var fileTagsList = await zipFolder.GetFileAsync(Constants.LocalSettings.FileTagSettingsFileName);
+				string importTags = await fileTagsList.ReadTextAsync();
+				fileTagsSettingsService.ImportSettings(importTags);
+				var fileTagsDB = await zipFolder.GetFileAsync(Constants.LocalSettings.FileTagSettingsDatabaseFileName);
+				string importTagsDB = await fileTagsDB.ReadTextAsync();
+				var tagDbInstance = FileTagsHelper.GetDbInstance();
+				tagDbInstance.Import(importTagsDB);
+
+				// Import layout preferences and DB
+				var layoutPrefsDB = await zipFolder.GetFileAsync(Constants.LocalSettings.UserSettingsDatabaseFileName);
+				string importPrefsDB = await layoutPrefsDB.ReadTextAsync();
+				var layoutDbInstance = LayoutPreferencesManager.GetDatabaseManagerInstance();
+				layoutDbInstance.Import(importPrefsDB);
+			}
+			catch (Exception ex)
+			{
+				App.Logger.LogWarning(ex, "Error importing settings");
+				UIHelpers.CloseAllDialogs();
+				await DialogDisplayHelper.ShowDialogAsync("SettingsImportErrorTitle".GetLocalizedResource(), "SettingsImportErrorDescription".GetLocalizedResource());
 			}
 		}
 
-		private async Task ExportSettings()
+		private async Task ExportSettingsAsync()
 		{
-			var applicationService = Ioc.Default.GetRequiredService<IApplicationService>();
+			string[] extensions = ["ZipFileCapitalized".GetLocalizedResource(), "*.zip" ];
+			bool result = CommonDialogService.Open_FileSaveDialog(MainWindow.Instance.WindowHandle, false, extensions, Environment.SpecialFolder.Desktop, out var filePath);
+			if (!result)
+				return;
 
-			FileSavePicker filePicker = InitializeWithWindow(new FileSavePicker());
-			filePicker.FileTypeChoices.Add("Zip File", new[] { ".zip" });
-			filePicker.SuggestedFileName = $"Files_{applicationService.AppVersion}";
+			if (!filePath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+				filePath += ".zip";
 
-			StorageFile file = await filePicker.PickSaveFileAsync();
-			if (file is not null)
+			try
 			{
-				try
-				{
-					await ZipStorageFolder.InitArchive(file, OutArchiveFormat.Zip);
+				var handle = Win32PInvoke.CreateFileFromAppW(
+					filePath,
+					(uint)(FILE_ACCESS_RIGHTS.FILE_GENERIC_READ | FILE_ACCESS_RIGHTS.FILE_GENERIC_WRITE),
+					Win32PInvoke.FILE_SHARE_READ | Win32PInvoke.FILE_SHARE_WRITE,
+					nint.Zero,
+					Win32PInvoke.CREATE_NEW,
+					0,
+					nint.Zero);
 
-					var zipFolder = (ZipStorageFolder)await ZipStorageFolder.FromStorageFileAsync(file);
-					if (zipFolder is null)
-						return;
+				Win32PInvoke.CloseHandle(handle);
 
-					var localFolderPath = ApplicationData.Current.LocalFolder.Path;
+				var file = await StorageHelpers.ToStorageItem<BaseStorageFile>(filePath);
 
-					// Export user settings
-					var exportSettings = UTF8Encoding.UTF8.GetBytes((string)UserSettingsService.ExportSettings());
-					await zipFolder.CreateFileAsync(new MemoryStream(exportSettings), Constants.LocalSettings.UserSettingsFileName, CreationCollisionOption.ReplaceExisting);
+				await ZipStorageFolder.InitArchive(file, OutArchiveFormat.Zip);
 
-					// Export file tags list and DB
-					var exportTags = UTF8Encoding.UTF8.GetBytes((string)fileTagsSettingsService.ExportSettings());
-					await zipFolder.CreateFileAsync(new MemoryStream(exportTags), Constants.LocalSettings.FileTagSettingsFileName, CreationCollisionOption.ReplaceExisting);
-					var tagDbInstance = FileTagsHelper.GetDbInstance();
-					byte[] exportTagsDB = UTF8Encoding.UTF8.GetBytes(tagDbInstance.Export());
-					await zipFolder.CreateFileAsync(new MemoryStream(exportTagsDB), Path.GetFileName(FileTagsHelper.FileTagsDbPath), CreationCollisionOption.ReplaceExisting);
+				var zipFolder = (ZipStorageFolder)await ZipStorageFolder.FromStorageFileAsync(file);
+				if (zipFolder is null)
+					return;
 
-					// Export layout preferences DB
-					var layoutDbInstance = FolderSettingsViewModel.GetDbInstance();
-					byte[] exportPrefsDB = UTF8Encoding.UTF8.GetBytes(layoutDbInstance.Export());
-					await zipFolder.CreateFileAsync(new MemoryStream(exportPrefsDB), Path.GetFileName(FolderSettingsViewModel.LayoutSettingsDbPath), CreationCollisionOption.ReplaceExisting);
-				}
-				catch (Exception ex)
-				{
-					App.Logger.LogWarning(ex, "Error exporting settings");
-				}
+				var localFolderPath = ApplicationData.Current.LocalFolder.Path;
+
+				// Export user settings
+				var exportSettings = UTF8Encoding.UTF8.GetBytes((string)UserSettingsService.ExportSettings());
+				await zipFolder.CreateFileAsync(new MemoryStream(exportSettings), Constants.LocalSettings.UserSettingsFileName, CreationCollisionOption.ReplaceExisting);
+
+				// Export file tags list and DB
+				var exportTags = UTF8Encoding.UTF8.GetBytes((string)fileTagsSettingsService.ExportSettings());
+				await zipFolder.CreateFileAsync(new MemoryStream(exportTags), Constants.LocalSettings.FileTagSettingsFileName, CreationCollisionOption.ReplaceExisting);
+				var tagDbInstance = FileTagsHelper.GetDbInstance();
+				byte[] exportTagsDB = UTF8Encoding.UTF8.GetBytes(tagDbInstance.Export());
+				await zipFolder.CreateFileAsync(new MemoryStream(exportTagsDB), Constants.LocalSettings.FileTagSettingsDatabaseFileName, CreationCollisionOption.ReplaceExisting);
+
+				// Export layout preferences DB
+				var layoutDbInstance = LayoutPreferencesManager.GetDatabaseManagerInstance();
+				byte[] exportPrefsDB = UTF8Encoding.UTF8.GetBytes(layoutDbInstance.Export());
+				await zipFolder.CreateFileAsync(new MemoryStream(exportPrefsDB), Constants.LocalSettings.UserSettingsDatabaseFileName, CreationCollisionOption.ReplaceExisting);
+			}
+			catch (Exception ex)
+			{
+				App.Logger.LogWarning(ex, "Error exporting settings");
 			}
 		}
 
@@ -250,9 +269,13 @@ namespace Files.App.ViewModels.Settings
 
 		private bool DetectIsSetAsOpenFileDialog()
 		{
-			using var subkey = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Classes\CLSID\{DC1C5A9C-E88A-4DDE-A5A1-60F82A20AEF7}");
+			using var subkeyOpen = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Classes\CLSID\{DC1C5A9C-E88A-4DDE-A5A1-60F82A20AEF7}");
+			using var subkeySave = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Classes\CLSID\{C0B4E2F3-BA21-4773-8DBA-335EC946EB8B}");
 
-			return subkey?.GetValue(string.Empty) as string == "FilesOpenDialog class";
+			var isSetAsOpenDialog = subkeyOpen?.GetValue(string.Empty) as string == "FilesOpenDialog class";
+			var isSetAsSaveDialog = subkeySave?.GetValue(string.Empty) as string == "FilesSaveDialog class";
+
+			return isSetAsOpenDialog || isSetAsSaveDialog;
 		}
 
 		private bool isSetAsDefaultFileManager;
@@ -267,6 +290,11 @@ namespace Files.App.ViewModels.Settings
 		{
 			get => isSetAsOpenFileDialog;
 			set => SetProperty(ref isSetAsOpenFileDialog, value);
+		}
+
+		public bool IsAppEnvironmentDev
+		{
+			get => AppLifecycleHelper.AppEnvironment is AppEnvironment.Dev;
 		}
 
 		private FileSavePicker InitializeWithWindow(FileSavePicker obj)
@@ -310,8 +338,36 @@ namespace Files.App.ViewModels.Settings
 				}
 			}
 		}
+		
+		public bool ShowSystemTrayIcon
+		{
+			get => UserSettingsService.GeneralSettingsService.ShowSystemTrayIcon;
+			set
+			{
+				if (value != UserSettingsService.GeneralSettingsService.ShowSystemTrayIcon)
+				{
+					UserSettingsService.GeneralSettingsService.ShowSystemTrayIcon = value;
 
-		public async Task OpenFilesOnWindowsStartup()
+					OnPropertyChanged();
+				}
+			}
+		}
+
+		// TODO remove when feature is marked as stable
+		public bool ShowFlattenOptions
+		{
+			get => UserSettingsService.GeneralSettingsService.ShowFlattenOptions;
+			set
+			{
+				if (value == UserSettingsService.GeneralSettingsService.ShowFlattenOptions)
+					return;
+
+				UserSettingsService.GeneralSettingsService.ShowFlattenOptions = value;
+				OnPropertyChanged();
+			}
+		}
+
+		public async Task OpenFilesOnWindowsStartupAsync()
 		{
 			var stateMode = await ReadState();
 
@@ -331,11 +387,11 @@ namespace Files.App.ViewModels.Settings
 					await startupTask.RequestEnableAsync();
 				else
 					startupTask.Disable();
-				await DetectOpenFilesAtStartup();
+				await DetectOpenFilesAtStartupAsync();
 			}
 		}
 
-		public async Task DetectOpenFilesAtStartup()
+		public async Task DetectOpenFilesAtStartupAsync()
 		{
 			var stateMode = await ReadState();
 

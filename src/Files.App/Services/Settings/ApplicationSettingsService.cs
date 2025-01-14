@@ -1,8 +1,8 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Files.App.Utils.Serialization;
-using Files.Core.Services.Settings;
+using Files.App.Services.Settings;
 
 namespace Files.App.Services.Settings
 {
@@ -15,6 +15,12 @@ namespace Files.App.Services.Settings
 		}
 		
 		public bool ShowRunningAsAdminPrompt
+		{
+			get => Get(true);
+			set => Set(value);
+		}
+		
+		public bool ShowDataStreamsAreHiddenPrompt
 		{
 			get => Get(true);
 			set => Set(value);

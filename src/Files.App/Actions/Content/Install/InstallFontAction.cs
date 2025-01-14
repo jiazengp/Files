@@ -1,11 +1,11 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Files.Shared.Helpers;
 
 namespace Files.App.Actions
 {
-	internal class InstallFontAction : ObservableObject, IAction
+	internal sealed class InstallFontAction : ObservableObject, IAction
 	{
 		private readonly IContentPageContext context;
 
@@ -31,9 +31,10 @@ namespace Files.App.Actions
 			context.PropertyChanged += Context_PropertyChanged;
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
-			return Task.WhenAll(context.SelectedItems.Select(x => Win32API.InstallFont(x.ItemPath, false)));
+			var paths = context.SelectedItems.Select(item => item.ItemPath).ToArray();
+			return Win32Helper.InstallFontsAsync(paths, false);
 		}
 
 		public void Context_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)

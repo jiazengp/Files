@@ -1,12 +1,10 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Actions
 {
-	internal class NewTabAction : IAction
+	internal sealed class NewTabAction : IAction
 	{
-		private readonly MainPageViewModel mainPageViewModel;
-
 		public string Label
 			=> "NewTab".GetLocalizedResource();
 
@@ -18,12 +16,11 @@ namespace Files.App.Actions
 
 		public NewTabAction()
 		{
-			mainPageViewModel = Ioc.Default.GetRequiredService<MainPageViewModel>();
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
-			return mainPageViewModel.AddNewTabAsync();
+			return NavigationHelpers.AddNewTabAsync();
 		}
 	}
 }

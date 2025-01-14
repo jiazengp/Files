@@ -1,9 +1,9 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Actions
 {
-	internal class SelectAllAction : IAction
+	internal sealed class SelectAllAction : IAction
 	{
 		private readonly IContentPageContext context;
 
@@ -14,7 +14,7 @@ namespace Files.App.Actions
 			=> "SelectAllDescription".GetLocalizedResource();
 
 		public RichGlyph Glyph
-			=> new("\uE8B3");
+			=> new(themedIconStyle: "App.ThemedIcons.SelectAll");
 
 		public HotKey HotKey
 			=> new(Keys.A, KeyModifiers.Ctrl);
@@ -30,15 +30,16 @@ namespace Files.App.Actions
 				if (page is null)
 					return false;
 
-				int itemCount = page.FilesystemViewModel.FilesAndFolders.Count;
+				int itemCount = page.ShellViewModel.FilesAndFolders.Count;
 				int selectedItemCount = context.SelectedItems.Count;
 				if (itemCount == selectedItemCount)
 					return false;
 
+				bool isCommandPaletteOpen = page.ToolbarViewModel.IsCommandPaletteOpen;
 				bool isEditing = page.ToolbarViewModel.IsEditModeEnabled;
-				bool isRenaming = page.SlimContentPage.IsRenamingItem;
+				bool isRenaming = page.SlimContentPage?.IsRenamingItem ?? false;
 
-				return !isEditing && !isRenaming;
+				return isCommandPaletteOpen || (!isEditing && !isRenaming);
 			}
 		}
 
@@ -47,7 +48,7 @@ namespace Files.App.Actions
 			context = Ioc.Default.GetRequiredService<IContentPageContext>();
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
 			context.ShellPage?.SlimContentPage?.ItemManipulationModel?.SelectAllItems();
 

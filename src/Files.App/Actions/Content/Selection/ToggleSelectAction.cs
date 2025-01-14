@@ -1,12 +1,12 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 
 namespace Files.App.Actions
 {
-	internal class ToggleSelectAction : IAction
+	internal sealed class ToggleSelectAction : IAction
 	{
 		public string Label
 			=> "ToggleSelect".GetLocalizedResource();
@@ -20,7 +20,7 @@ namespace Files.App.Actions
 		public bool IsExecutable
 			=> GetFocusedElement() is not null;
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
 			if (GetFocusedElement() is SelectorItem item)
 				item.IsSelected = !item.IsSelected;

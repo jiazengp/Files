@@ -1,25 +1,13 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
-using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.DependencyInjection;
-using CommunityToolkit.Mvvm.Input;
-using CommunityToolkit.WinUI;
-using Files.App.Extensions;
-using Files.App.Utils;
-using Files.Shared.Extensions;
 using Files.Shared.Helpers;
-using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.IO;
-using System.Linq;
-using System.Threading;
 using System.Windows.Input;
 
 namespace Files.App.ViewModels.Properties
 {
-	public class HashesViewModel : ObservableObject, IDisposable
+	public sealed class HashesViewModel : ObservableObject, IDisposable
 	{
 		private IUserSettingsService UserSettingsService { get; } = Ioc.Default.GetService<IUserSettingsService>()!;
 
@@ -47,17 +35,17 @@ namespace Files.App.ViewModels.Properties
 			_item = item;
 			_cancellationTokenSource = new();
 
-			Hashes = new()
-			{
+			Hashes =
+			[
 				new() { Algorithm = "CRC32" },
 				new() { Algorithm = "MD5" },
 				new() { Algorithm = "SHA1" },
 				new() { Algorithm = "SHA256" },
 				new() { Algorithm = "SHA384" },
 				new() { Algorithm = "SHA512" },
-			};
+			];
 
-			ShowHashes = UserSettingsService.GeneralSettingsService.ShowHashesDictionary ?? new();
+			ShowHashes = UserSettingsService.GeneralSettingsService.ShowHashesDictionary ?? [];
 			// Default settings
 			ShowHashes.TryAdd("CRC32", true);
 			ShowHashes.TryAdd("MD5", true);
@@ -71,13 +59,20 @@ namespace Files.App.ViewModels.Properties
 
 		private void ToggleIsEnabled(string? algorithm)
 		{
-			var hashInfoItem = Hashes.Where(x => x.Algorithm == algorithm).First();
+			var hashInfoItem = Hashes.First(x => x.Algorithm == algorithm);
 			hashInfoItem.IsEnabled = !hashInfoItem.IsEnabled;
 
 			if (ShowHashes[hashInfoItem.Algorithm] != hashInfoItem.IsEnabled)
 			{
 				ShowHashes[hashInfoItem.Algorithm] = hashInfoItem.IsEnabled;
 				UserSettingsService.GeneralSettingsService.ShowHashesDictionary = ShowHashes;
+			}
+
+			// Don't calculate hashes for online files
+			if (_item.SyncStatusUI.SyncStatus is CloudDriveSyncStatus.FileOnline or CloudDriveSyncStatus.FolderOnline)
+			{
+				hashInfoItem.HashValue = "CalculationOnlineFileHashError".GetLocalizedResource();
+				return;
 			}
 
 			if (hashInfoItem.HashValue is null && hashInfoItem.IsEnabled)
@@ -107,6 +102,11 @@ namespace Files.App.ViewModels.Properties
 					catch (OperationCanceledException)
 					{
 						// not an error
+					}
+					catch (IOException)
+					{
+						// File is currently open
+						hashInfoItem.HashValue = "CalculationErrorFileIsOpen".GetLocalizedResource();
 					}
 					catch (Exception)
 					{

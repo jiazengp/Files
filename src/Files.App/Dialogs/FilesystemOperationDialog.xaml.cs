@@ -1,20 +1,18 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using CommunityToolkit.WinUI.UI;
-using Files.App.Utils;
-using Files.Core.ViewModels.Dialogs;
-using Files.Core.ViewModels.Dialogs.FileSystemDialog;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media;
-using System;
-using System.Threading.Tasks;
 
 namespace Files.App.Dialogs
 {
 	public sealed partial class FilesystemOperationDialog : ContentDialog, IDialog<FileSystemDialogViewModel>
 	{
+		private FrameworkElement RootAppElement
+			=> (FrameworkElement)MainWindow.Instance.Content;
+
 		public FileSystemDialogViewModel ViewModel
 		{
 			get => (FileSystemDialogViewModel)DataContext;
@@ -57,8 +55,18 @@ namespace Files.App.Dialogs
 
 		private void UpdateDialogLayout()
 		{
-			if (ViewModel.FileSystemDialogMode.ConflictsExist)
-				ContainerGrid.Width = MainWindow.Instance.Bounds.Width <= 700 ? MainWindow.Instance.Bounds.Width - 50 : 650;
+			try
+			{
+				if (ViewModel.FileSystemDialogMode.ConflictsExist)
+					ContainerGrid.Width = MainWindow.Instance.Bounds.Width <= 700 ? MainWindow.Instance.Bounds.Width - 50 : 650;
+			}
+			catch (Exception ex)
+			{
+				// Handle exception in case WinUI Windows is closed
+				// (see https://github.com/files-community/Files/issues/15599)
+
+				App.Logger.LogWarning(ex, ex.Message);
+			}
 		}
 
 		protected override void OnApplyTemplate()
@@ -72,7 +80,8 @@ namespace Files.App.Dialogs
 
 		private void PrimaryButton_GotFocus(object sender, RoutedEventArgs e)
 		{
-			(sender as Button).GotFocus -= PrimaryButton_GotFocus;
+			if (sender is Button btn)
+				btn.GotFocus -= PrimaryButton_GotFocus;
 
 			if (chkPermanentlyDelete is not null)
 				chkPermanentlyDelete.IsEnabled = ViewModel.IsDeletePermanentlyEnabled;
@@ -95,33 +104,14 @@ namespace Files.App.Dialogs
 				element.DataContext is FileSystemDialogConflictItemViewModel conflictItem &&
 				conflictItem.ConflictResolveOption == FileNameConflictResolveOptionType.GenerateNewName)
 			{
-				conflictItem.IsTextBoxVisible = conflictItem.ConflictResolveOption == FileNameConflictResolveOptionType.GenerateNewName;
-				conflictItem.CustomName = conflictItem.DestinationDisplayName;
+				StartRename(conflictItem);
 			}
 		}
 
 		private void NameEdit_LostFocus(object sender, RoutedEventArgs e)
 		{
 			if ((sender as FrameworkElement)?.DataContext is FileSystemDialogConflictItemViewModel conflictItem)
-			{
-				conflictItem.CustomName = FilesystemHelpers.FilterRestrictedCharacters(conflictItem.CustomName);
-
-				if (ViewModel.IsNameAvailableForItem(conflictItem, conflictItem.CustomName!))
-				{
-					conflictItem.IsTextBoxVisible = false;
-				}
-				else
-				{
-					ViewModel.PrimaryButtonEnabled = false;
-				}
-
-				if (conflictItem.CustomName.Equals(conflictItem.DisplayName))
-				{
-					var savedName = conflictItem.DestinationDisplayName;
-					conflictItem.CustomName = string.Empty;
-					conflictItem.DestinationDisplayName = savedName;
-				}
-			}
+				EndRename(conflictItem);
 		}
 
 		private void NameEdit_Loaded(object sender, RoutedEventArgs e)
@@ -129,27 +119,71 @@ namespace Files.App.Dialogs
 			(sender as TextBox)?.Focus(FocusState.Programmatic);
 		}
 
-		private void ConflictOptions_Loaded(object sender, RoutedEventArgs e)
-		{
-			if (sender is ComboBox comboBox)
-				comboBox.SelectedIndex = ViewModel.LoadConflictResolveOption() switch
-				{
-					FileNameConflictResolveOptionType.None => -1,
-					FileNameConflictResolveOptionType.GenerateNewName => 0,
-					FileNameConflictResolveOptionType.ReplaceExisting => 1,
-					FileNameConflictResolveOptionType.Skip => 2,
-					_ => -1
-				};
-		}
-
 		private void FilesystemOperationDialog_Opened(ContentDialog sender, ContentDialogOpenedEventArgs args)
 		{
-			if (ViewModel.FileSystemDialogMode.IsInDeleteMode)
-			{
-				DescriptionText.Foreground = App.Current.Resources["TextControlForeground"] as SolidColorBrush;
-			}
-
 			UpdateDialogLayout();
+		}
+
+		private void NameEdit_PreviewKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+		{
+			if (sender is not FrameworkElement element || element.DataContext is not FileSystemDialogConflictItemViewModel currentItem)
+				return;
+
+			if (e.Key is Windows.System.VirtualKey.Down)
+			{
+				var index = ViewModel.Items.IndexOf(currentItem);
+				if (index == -1 || index == ViewModel.Items.Count - 1)
+					return;
+
+				var nextItem = ViewModel.Items.Skip(index + 1)
+					.FirstOrDefault(i => i is FileSystemDialogConflictItemViewModel { ConflictResolveOption: FileNameConflictResolveOptionType.GenerateNewName });
+
+				if (nextItem is null)
+					return;
+
+				EndRename(currentItem);
+				StartRename((FileSystemDialogConflictItemViewModel)nextItem);
+
+				e.Handled = true;
+			}
+			else if (e.Key is Windows.System.VirtualKey.Up)
+			{
+				var index = ViewModel.Items.IndexOf(currentItem);
+				if (index == -1 || index == 0)
+					return;
+
+				var prevItem = ViewModel.Items.Take(index)
+					.LastOrDefault(i => i is FileSystemDialogConflictItemViewModel { ConflictResolveOption: FileNameConflictResolveOptionType.GenerateNewName });
+				if (prevItem is null)
+					return;
+
+				EndRename(currentItem);
+				StartRename((FileSystemDialogConflictItemViewModel)prevItem);
+
+				e.Handled = true;
+			}
+		}
+
+		private void StartRename(FileSystemDialogConflictItemViewModel conflictItem)
+		{
+			conflictItem.IsTextBoxVisible = conflictItem.ConflictResolveOption == FileNameConflictResolveOptionType.GenerateNewName;
+			conflictItem.CustomName = conflictItem.DestinationDisplayName;
+		}
+
+		private void EndRename(FileSystemDialogConflictItemViewModel conflictItem)
+		{
+			conflictItem.CustomName = FilesystemHelpers.FilterRestrictedCharacters(conflictItem.CustomName);
+
+			if (ViewModel.IsNameAvailableForItem(conflictItem, conflictItem.CustomName!))
+				conflictItem.IsTextBoxVisible = false;
+			else
+				ViewModel.PrimaryButtonEnabled = false;
+
+			if (conflictItem.CustomName.Equals(conflictItem.DisplayName))
+			{
+				var savedName = conflictItem.DestinationDisplayName;
+				conflictItem.DestinationDisplayName = savedName;
+			}
 		}
 	}
 }

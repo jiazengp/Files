@@ -1,8 +1,7 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using CommunityToolkit.WinUI.UI;
-using Files.Core.ViewModels.FileTags;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
@@ -13,6 +12,8 @@ namespace Files.App.Views.Settings
 {
 	public sealed partial class TagsPage : Page
 	{
+		private readonly IWindowContext WindowContext = Ioc.Default.GetRequiredService<IWindowContext>();
+
 		private string oldTagName = string.Empty;
 
 		// Will be null unless the user has edited any tag
@@ -20,9 +21,8 @@ namespace Files.App.Views.Settings
 
 		private FlyoutBase? deleteItemFlyout;
 
-		// See issue #12390 on Github. Dragging makes the app crash when run as admin.
-		// Further reading: https://github.com/microsoft/terminal/issues/12017#issuecomment-1004129669
-		public bool AllowItemsDrag => !ElevationHelpers.IsAppRunAsAdmin();
+		public bool AllowItemsDrag
+			=> WindowContext.CanDragAndDrop;
 
 		public TagsPage()
 		{

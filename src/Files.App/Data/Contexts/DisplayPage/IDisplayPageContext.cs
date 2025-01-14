@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Data.Contexts
 {
@@ -16,8 +16,6 @@ namespace Files.App.Data.Contexts
 		GroupByDateUnit GroupByDateUnit { get; set; }
 
 		bool SortDirectoriesAlongsideFiles { get; set; }
-
-		void DecreaseLayoutSize();
-		void IncreaseLayoutSize();
+		bool SortFilesFirst { get; set; }
 	}
 }

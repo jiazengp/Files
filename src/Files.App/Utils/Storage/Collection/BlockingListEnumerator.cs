@@ -1,9 +1,9 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Utils.Storage
 {
-	public class BlockingListEnumerator<T> : IEnumerator<T>
+	public sealed class BlockingListEnumerator<T> : IEnumerator<T>
 	{
 		private readonly IList<T> m_Inner;
 

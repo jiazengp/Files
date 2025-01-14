@@ -1,11 +1,8 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
-using Files.App.Utils.Serialization;
-using Files.Core.Services.Settings;
-using Microsoft.AppCenter.Analytics;
-using Microsoft.UI.Composition.SystemBackdrops;
-using System;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Media;
 
 namespace Files.App.Services.Settings
 {
@@ -29,9 +26,10 @@ namespace Files.App.Services.Settings
 			set => Set(value);
 		}
 
-		public bool UseCompactStyles
+		/// <inheritdoc/>
+		public string AppThemeMode
 		{
-			get => Get(false);
+			get => Get("Default");
 			set => Set(value);
 		}
 
@@ -44,6 +42,13 @@ namespace Files.App.Services.Settings
 
 		/// <inheritdoc/>
 		public String AppThemeAddressBarBackgroundColor
+		{
+			get => Get("");
+			set => Set(value);
+		}
+
+		/// <inheritdoc/>
+		public String AppThemeToolbarBackgroundColor
 		{
 			get => Get("");
 			set => Set(value);
@@ -64,6 +69,20 @@ namespace Files.App.Services.Settings
 		}
 
 		/// <inheritdoc/>
+		public String AppThemeFileAreaSecondaryBackgroundColor
+		{
+			get => Get("");
+			set => Set(value);
+		}
+
+		/// <inheritdoc/>
+		public String AppThemeInfoPaneBackgroundColor
+		{
+			get => Get("");
+			set => Set(value);
+		}
+
+		/// <inheritdoc/>
 		public String AppThemeFontFamily
 		{
 			get => Get("Segoe UI Variable");
@@ -77,20 +96,71 @@ namespace Files.App.Services.Settings
 			set => Set(value);
 		}
 
+		/// <inheritdoc/>
+		public string AppThemeBackgroundImageSource
+		{
+			get => Get("");
+			set => Set(value);
+		}
+
+		/// <inheritdoc/>
+		public Stretch AppThemeBackgroundImageFit
+		{
+			get => Get(Stretch.UniformToFill);
+			set => Set(value);
+		}
+
+		/// <inheritdoc/>
+		public float AppThemeBackgroundImageOpacity
+		{
+			get => Get(1f);
+			set => Set(value);
+		}
+
+		/// <inheritdoc/>
+		public VerticalAlignment AppThemeBackgroundImageVerticalAlignment
+		{
+			get => Get(VerticalAlignment.Center);
+			set => Set(value);
+		}
+
+		/// <inheritdoc/>
+		public HorizontalAlignment AppThemeBackgroundImageHorizontalAlignment
+		{
+			get => Get(HorizontalAlignment.Center);
+			set => Set(value);
+		}
+
+		/// <inheritdoc/>
+		public bool ShowToolbar
+		{
+			get => Get(true);
+			set => Set(value);
+		}
+
+		/// <inheritdoc/>
+		public bool ShowTabActions
+		{
+			get => Get(true);
+			set => Set(value);
+		}
+
+		/// <inheritdoc/>
+		public bool ShowHomeButton
+		{
+			get => Get(false);
+			set => Set(value);
+		}
+
+		/// <inheritdoc/>
+		public bool ShowShelfPaneToggleButton
+		{
+			get => Get(false);
+			set => Set(value);
+		}
+
 		protected override void RaiseOnSettingChangedEvent(object sender, SettingChangedEventArgs e)
 		{
-			switch (e.SettingName)
-			{
-				case nameof(UseCompactStyles):
-				case nameof(AppThemeBackgroundColor):
-				case nameof(AppThemeAddressBarBackgroundColor):
-				case nameof(AppThemeSidebarBackgroundColor):
-				case nameof(AppThemeFileAreaBackgroundColor):
-				case nameof(AppThemeBackdropMaterial):
-					Analytics.TrackEvent($"Set {e.SettingName} to {e.NewValue}");
-					break;
-			}
-
 			base.RaiseOnSettingChangedEvent(sender, e);
 		}
 	}

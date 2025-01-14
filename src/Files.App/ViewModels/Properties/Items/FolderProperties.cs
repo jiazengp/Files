@@ -1,5 +1,5 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
@@ -8,8 +8,10 @@ using ByteSize = ByteSizeLib.ByteSize;
 
 namespace Files.App.ViewModels.Properties
 {
-	internal class FolderProperties : BaseProperties
+	internal sealed class FolderProperties : BaseProperties
 	{
+		private readonly IStorageTrashBinService StorageTrashBinService = Ioc.Default.GetRequiredService<IStorageTrashBinService>();
+
 		public ListedItem Item { get; }
 
 		public FolderProperties(
@@ -39,7 +41,7 @@ namespace Files.App.ViewModels.Properties
 				ViewModel.ItemType = Item.ItemType;
 				ViewModel.ItemLocation = (Item as RecycleBinItem)?.ItemOriginalFolder ??
 					(Path.IsPathRooted(Item.ItemPath) ? Path.GetDirectoryName(Item.ItemPath) : Item.ItemPath);
-				ViewModel.ItemModifiedTimestampReal= Item.ItemDateModifiedReal;
+				ViewModel.ItemModifiedTimestampReal = Item.ItemDateModifiedReal;
 				ViewModel.ItemCreatedTimestampReal = Item.ItemDateCreatedReal;
 				ViewModel.LoadCustomIcon = Item.LoadCustomIcon;
 				ViewModel.CustomIconSource = Item.CustomIconSource;
@@ -53,13 +55,15 @@ namespace Files.App.ViewModels.Properties
 					ViewModel.ShortcutItemPath = shortcutItem.TargetPath;
 					ViewModel.IsShortcutItemPathReadOnly = false;
 					ViewModel.ShortcutItemWorkingDir = shortcutItem.WorkingDirectory;
+					ViewModel.ShowWindowCommand = shortcutItem.ShowWindowCommand;
 					ViewModel.ShortcutItemWorkingDirVisibility = false;
 					ViewModel.ShortcutItemArguments = shortcutItem.Arguments;
 					ViewModel.ShortcutItemArgumentsVisibility = false;
+					ViewModel.ShortcutItemWindowArgsVisibility = false;
 					ViewModel.ShortcutItemOpenLinkCommand = new RelayCommand(async () =>
 					{
 						await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(
-							() => NavigationHelpers.OpenPathInNewTab(Path.GetDirectoryName(Environment.ExpandEnvironmentVariables(ViewModel.ShortcutItemPath))));
+							() => NavigationHelpers.OpenPathInNewTab(Path.GetDirectoryName(Environment.ExpandEnvironmentVariables(ViewModel.ShortcutItemPath)), true));
 					},
 					() =>
 					{
@@ -69,15 +73,21 @@ namespace Files.App.ViewModels.Properties
 			}
 		}
 
-		public async override Task GetSpecialProperties()
+		public async override Task GetSpecialPropertiesAsync()
 		{
-			ViewModel.IsHidden = NativeFileOperationsHelper.HasFileAttribute(
-				Item.ItemPath, System.IO.FileAttributes.Hidden);
+			ViewModel.IsHidden = Win32Helper.HasFileAttribute(Item.ItemPath, System.IO.FileAttributes.Hidden);
+			ViewModel.CanCompressContent = Win32Helper.CanCompressContent(Item.ItemPath);
+			ViewModel.IsContentCompressed = Win32Helper.HasFileAttribute(Item.ItemPath, System.IO.FileAttributes.Compressed);
 
-			var fileIconData = await FileThumbnailHelper.LoadIconFromPathAsync(Item.ItemPath, 80, Windows.Storage.FileProperties.ThumbnailMode.SingleItem, true);
-			if (fileIconData is not null)
+			var result = await FileThumbnailHelper.GetIconAsync(
+				Item.ItemPath,
+				Constants.ShellIconSizes.ExtraLarge,
+				true,
+				IconOptions.UseCurrentScale);
+			
+			if (result is not null)
 			{
-				ViewModel.IconData = fileIconData;
+				ViewModel.IconData = result;
 				ViewModel.LoadFolderGlyph = false;
 				ViewModel.LoadFileIcon = true;
 			}
@@ -86,11 +96,12 @@ namespace Files.App.ViewModels.Properties
 			{
 				ViewModel.ItemSizeVisibility = true;
 				ViewModel.ItemSize = Item.FileSizeBytes.ToLongSizeString();
-				var sizeOnDisk = NativeFileOperationsHelper.GetFileSizeOnDisk(Item.ItemPath);
-				if (sizeOnDisk is not null)
-				{
-					ViewModel.ItemSizeOnDisk = ((long)sizeOnDisk).ToLongSizeString();
-				}
+
+				// Only load the size for items on the device
+				if (Item.SyncStatusUI.SyncStatus is not CloudDriveSyncStatus.FileOnline and not CloudDriveSyncStatus.FolderOnline)
+					ViewModel.ItemSizeOnDisk = Win32Helper.GetFileSizeOnDisk(Item.ItemPath)?.ToLongSizeString() ??
+					   string.Empty;
+
 				ViewModel.ItemCreatedTimestampReal = Item.ItemDateCreatedReal;
 				ViewModel.ItemAccessedTimestampReal = Item.ItemDateAccessedReal;
 				if (Item.IsLinkItem || string.IsNullOrWhiteSpace(((ShortcutItem)Item).TargetPath))
@@ -101,20 +112,23 @@ namespace Files.App.ViewModels.Properties
 			}
 
 			string folderPath = (Item as ShortcutItem)?.TargetPath ?? Item.ItemPath;
-			BaseStorageFolder storageFolder = await AppInstance.FilesystemViewModel.GetFolderFromPathAsync(folderPath);
+			BaseStorageFolder storageFolder = await AppInstance.ShellViewModel.GetFolderFromPathAsync(folderPath);
 
 			if (storageFolder is not null)
 			{
 				ViewModel.ItemCreatedTimestampReal = storageFolder.DateCreated;
 				if (storageFolder.Properties is not null)
-				{
-					GetOtherProperties(storageFolder.Properties);
-				}
-				GetFolderSize(storageFolder.Path, TokenSource.Token);
+					GetOtherPropertiesAsync(storageFolder.Properties);
+
+				// Only load the size for items on the device
+				if (Item.SyncStatusUI.SyncStatus is not CloudDriveSyncStatus.FileOnline and not 
+					CloudDriveSyncStatus.FolderOnline and not
+					CloudDriveSyncStatus.FolderOfflinePartial)
+					GetFolderSizeAsync(storageFolder.Path, TokenSource.Token);
 			}
 			else if (Item.ItemPath.Equals(Constants.UserEnvironmentPaths.RecycleBinPath, StringComparison.OrdinalIgnoreCase))
 			{
-				var recycleBinQuery = Win32Shell.QueryRecycleBin();
+				var recycleBinQuery = StorageTrashBinService.QueryRecycleBin();
 				if (recycleBinQuery.BinSize is long binSize)
 				{
 					ViewModel.ItemSizeBytes = binSize;
@@ -144,11 +158,11 @@ namespace Files.App.ViewModels.Properties
 			}
 			else
 			{
-				GetFolderSize(folderPath, TokenSource.Token);
+				GetFolderSizeAsync(folderPath, TokenSource.Token);
 			}
 		}
 
-		private async Task GetFolderSize(string folderPath, CancellationToken token)
+		private async Task GetFolderSizeAsync(string folderPath, CancellationToken token)
 		{
 			if (string.IsNullOrEmpty(folderPath))
 			{
@@ -190,28 +204,30 @@ namespace Files.App.ViewModels.Properties
 		{
 			switch (e.PropertyName)
 			{
-				case "IsHidden":
-					if (ViewModel.IsHidden)
+				case nameof(ViewModel.IsHidden):
+					if (ViewModel.IsHidden is not null)
 					{
-						NativeFileOperationsHelper.SetFileAttribute(
-							Item.ItemPath, System.IO.FileAttributes.Hidden);
-					}
-					else
-					{
-						NativeFileOperationsHelper.UnsetFileAttribute(
-							Item.ItemPath, System.IO.FileAttributes.Hidden);
+						if ((bool)ViewModel.IsHidden)
+							Win32Helper.SetFileAttribute(Item.ItemPath, System.IO.FileAttributes.Hidden);
+						else
+							Win32Helper.UnsetFileAttribute(Item.ItemPath, System.IO.FileAttributes.Hidden);
 					}
 					break;
 
-				case "ShortcutItemPath":
-				case "ShortcutItemWorkingDir":
-				case "ShortcutItemArguments":
+				case nameof(ViewModel.IsContentCompressed):
+					Win32Helper.SetCompressionAttributeIoctl(Item.ItemPath, ViewModel.IsContentCompressed ?? false);
+					break;
+
+				case nameof(ViewModel.ShortcutItemPath):
+				case nameof(ViewModel.ShortcutItemWorkingDir):
+				case nameof(ViewModel.ShowWindowCommand):
+				case nameof(ViewModel.ShortcutItemArguments):
 					var tmpItem = (ShortcutItem)Item;
 
 					if (string.IsNullOrWhiteSpace(ViewModel.ShortcutItemPath))
 						return;
 
-					await FileOperationsHelpers.CreateOrUpdateLinkAsync(Item.ItemPath, ViewModel.ShortcutItemPath, ViewModel.ShortcutItemArguments, ViewModel.ShortcutItemWorkingDir, tmpItem.RunAsAdmin);
+					await FileOperationsHelpers.CreateOrUpdateLinkAsync(Item.ItemPath, ViewModel.ShortcutItemPath, ViewModel.ShortcutItemArguments, ViewModel.ShortcutItemWorkingDir, tmpItem.RunAsAdmin, ViewModel.ShowWindowCommand);
 					break;
 			}
 		}
