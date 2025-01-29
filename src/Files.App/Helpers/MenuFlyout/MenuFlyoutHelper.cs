@@ -1,26 +1,20 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
-using CommunityToolkit.WinUI;
-using Files.App.Extensions;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using System.Windows.Input;
 
 namespace Files.App.Helpers
 {
-	public class MenuFlyoutHelper : DependencyObject
+	[Obsolete("Must not use this helper to generate menu flyout any longer.")]
+	public sealed class MenuFlyoutHelper : DependencyObject
 	{
-		#region View Models
-
 		public interface IMenuFlyoutItemViewModel { }
 
-		public class MenuFlyoutSeparatorViewModel : IMenuFlyoutItemViewModel { }
+		public sealed class MenuFlyoutSeparatorViewModel : IMenuFlyoutItemViewModel { }
 
-		public class MenuFlyoutItemViewModel : IMenuFlyoutItemViewModel
+		public sealed class MenuFlyoutItemViewModel : IMenuFlyoutItemViewModel
 		{
 			public string Text { get; init; }
 
@@ -36,7 +30,7 @@ namespace Files.App.Helpers
 				=> Text = text;
 		}
 
-		public class MenuFlyoutSubItemViewModel : IMenuFlyoutItemViewModel
+		public sealed class MenuFlyoutSubItemViewModel : IMenuFlyoutItemViewModel
 		{
 			public string Text { get; }
 
@@ -48,7 +42,7 @@ namespace Files.App.Helpers
 				=> Text = text;
 		}
 
-		public class MenuFlyoutFactoryItemViewModel : IMenuFlyoutItemViewModel
+		public sealed class MenuFlyoutFactoryItemViewModel : IMenuFlyoutItemViewModel
 		{
 			public Func<MenuFlyoutItemBase> Build { get; }
 
@@ -56,21 +50,13 @@ namespace Files.App.Helpers
 				=> Build = factoryFunc;
 		}
 
-		#endregion View Models
-
-		#region ItemsSource
-
 		public static IEnumerable<IMenuFlyoutItemViewModel> GetItemsSource(DependencyObject obj) => obj.GetValue(ItemsSourceProperty) as IEnumerable<IMenuFlyoutItemViewModel>;
 
 		public static void SetItemsSource(DependencyObject obj, IEnumerable<IMenuFlyoutItemViewModel> value) => obj.SetValue(ItemsSourceProperty, value);
 
 		public static readonly DependencyProperty ItemsSourceProperty = DependencyProperty.RegisterAttached("ItemsSource", typeof(IEnumerable<IMenuFlyoutItemViewModel>), typeof(MenuFlyoutHelper), new PropertyMetadata(null, ItemsSourceChanged));
 
-		private static void ItemsSourceChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) => SetupItems(d as MenuFlyout);
-
-		#endregion ItemsSource
-
-		#region IsVisible
+		private static void ItemsSourceChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) => SetupItemsAsync(d as MenuFlyout);
 
 		public static bool GetIsVisible(DependencyObject d) => (bool)d.GetValue(IsVisibleProperty);
 
@@ -81,9 +67,7 @@ namespace Files.App.Helpers
 		private static void OnIsVisiblePropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
 		{
 			if (d is not MenuFlyout flyout)
-			{
 				return;
-			}
 
 			var boolValue = (bool)e.NewValue;
 
@@ -92,9 +76,7 @@ namespace Files.App.Helpers
 				flyout.Hide();
 		}
 
-		#endregion IsVisible
-
-		private static async Task SetupItems(MenuFlyout menu)
+		private static async Task SetupItemsAsync(MenuFlyout menu)
 		{
 			if (menu is null || Windows.ApplicationModel.DesignMode.DesignModeEnabled)
 			{

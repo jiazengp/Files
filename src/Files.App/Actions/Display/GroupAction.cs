@@ -1,9 +1,9 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Actions
 {
-	internal class GroupByNoneAction : GroupByAction
+	internal sealed class GroupByNoneAction : GroupByAction
 	{
 		protected override GroupOption GroupOption
 			=> GroupOption.None;
@@ -15,7 +15,7 @@ namespace Files.App.Actions
 			=> "GroupByNoneDescription".GetLocalizedResource();
 	}
 
-	internal class GroupByNameAction : GroupByAction
+	internal sealed class GroupByNameAction : GroupByAction
 	{
 		protected override GroupOption GroupOption
 			=> GroupOption.Name;
@@ -27,7 +27,7 @@ namespace Files.App.Actions
 			=> "GroupByNameDescription".GetLocalizedResource();
 	}
 
-	internal class GroupByDateModifiedAction : GroupByAction
+	internal sealed class GroupByDateModifiedAction : GroupByAction
 	{
 		protected override GroupOption GroupOption
 			=> GroupOption.DateModified;
@@ -39,7 +39,7 @@ namespace Files.App.Actions
 			=> "GroupByDateModifiedDescription".GetLocalizedResource();
 	}
 
-	internal class GroupByDateCreatedAction : GroupByAction
+	internal sealed class GroupByDateCreatedAction : GroupByAction
 	{
 		protected override GroupOption GroupOption
 			=> GroupOption.DateCreated;
@@ -51,7 +51,7 @@ namespace Files.App.Actions
 			=> "GroupByDateCreatedDescription".GetLocalizedResource();
 	}
 
-	internal class GroupBySizeAction : GroupByAction
+	internal sealed class GroupBySizeAction : GroupByAction
 	{
 		protected override GroupOption GroupOption
 			=> GroupOption.Size;
@@ -63,7 +63,7 @@ namespace Files.App.Actions
 			=> "GroupBySizeDescription".GetLocalizedResource();
 	}
 
-	internal class GroupByTypeAction : GroupByAction
+	internal sealed class GroupByTypeAction : GroupByAction
 	{
 		protected override GroupOption GroupOption
 			=> GroupOption.FileType;
@@ -75,7 +75,7 @@ namespace Files.App.Actions
 			=> "GroupByTypeDescription".GetLocalizedResource();
 	}
 
-	internal class GroupBySyncStatusAction : GroupByAction
+	internal sealed class GroupBySyncStatusAction : GroupByAction
 	{
 		protected override GroupOption GroupOption
 			=> GroupOption.SyncStatus;
@@ -90,7 +90,7 @@ namespace Files.App.Actions
 			=> pageType is ContentPageTypes.CloudDrive;
 	}
 
-	internal class GroupByTagAction : GroupByAction
+	internal sealed class GroupByTagAction : GroupByAction
 	{
 		protected override GroupOption GroupOption
 			=> GroupOption.FileTag;
@@ -102,7 +102,7 @@ namespace Files.App.Actions
 			=> "GroupByTagDescription".GetLocalizedResource();
 	}
 
-	internal class GroupByOriginalFolderAction : GroupByAction
+	internal sealed class GroupByOriginalFolderAction : GroupByAction
 	{
 		protected override GroupOption GroupOption
 			=> GroupOption.OriginalFolder;
@@ -117,7 +117,7 @@ namespace Files.App.Actions
 			=> pageType is ContentPageTypes.RecycleBin;
 	}
 
-	internal class GroupByDateDeletedAction : GroupByAction
+	internal sealed class GroupByDateDeletedAction : GroupByAction
 	{
 		protected override GroupOption GroupOption
 			=> GroupOption.DateDeleted;
@@ -132,7 +132,7 @@ namespace Files.App.Actions
 			=> pageType is ContentPageTypes.RecycleBin;
 	}
 
-	internal class GroupByFolderPathAction : GroupByAction
+	internal sealed class GroupByFolderPathAction : GroupByAction
 	{
 		protected override GroupOption GroupOption
 			=> GroupOption.FolderPath;
@@ -174,9 +174,10 @@ namespace Files.App.Actions
 			DisplayContext.PropertyChanged += DisplayContext_PropertyChanged;
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
 			DisplayContext.GroupOption = GroupOption;
+			LayoutHelpers.UpdateOpenTabsPreferences();
 
 			return Task.CompletedTask;
 		}
@@ -199,7 +200,7 @@ namespace Files.App.Actions
 		}
 	}
 
-	internal class GroupByDateModifiedYearAction : GroupByDateAction
+	internal sealed class GroupByDateModifiedYearAction : GroupByDateAction
 	{
 		protected override GroupOption GroupOption
 			=> GroupOption.DateModified;
@@ -214,7 +215,7 @@ namespace Files.App.Actions
 			=> "GroupByDateModifiedYearDescription".GetLocalizedResource();
 	}
 
-	internal class GroupByDateModifiedMonthAction : GroupByDateAction
+	internal sealed class GroupByDateModifiedMonthAction : GroupByDateAction
 	{
 		protected override GroupOption GroupOption
 			=> GroupOption.DateModified;
@@ -229,7 +230,22 @@ namespace Files.App.Actions
 			=> "GroupByDateModifiedMonthDescription".GetLocalizedResource();
 	}
 
-	internal class GroupByDateCreatedYearAction : GroupByDateAction
+	internal sealed class GroupByDateModifiedDayAction : GroupByDateAction
+	{
+		protected override GroupOption GroupOption
+			=> GroupOption.DateModified;
+
+		protected override GroupByDateUnit GroupByDateUnit
+			=> GroupByDateUnit.Day;
+
+		public override string Label
+			=> "Day".GetLocalizedResource();
+
+		public override string Description
+			=> "GroupByDateModifiedDayDescription".GetLocalizedResource();
+	}
+
+	internal sealed class GroupByDateCreatedYearAction : GroupByDateAction
 	{
 		protected override GroupOption GroupOption
 			=> GroupOption.DateCreated;
@@ -244,7 +260,7 @@ namespace Files.App.Actions
 			=> "GroupByDateCreatedYearDescription".GetLocalizedResource();
 	}
 
-	internal class GroupByDateCreatedMonthAction : GroupByDateAction
+	internal sealed class GroupByDateCreatedMonthAction : GroupByDateAction
 	{
 		protected override GroupOption GroupOption
 			=> GroupOption.DateCreated;
@@ -259,7 +275,22 @@ namespace Files.App.Actions
 			=> "GroupByDateCreatedMonthDescription".GetLocalizedResource();
 	}
 
-	internal class GroupByDateDeletedYearAction : GroupByDateAction
+	internal sealed class GroupByDateCreatedDayAction : GroupByDateAction
+	{
+		protected override GroupOption GroupOption
+			=> GroupOption.DateCreated;
+
+		protected override GroupByDateUnit GroupByDateUnit
+			=> GroupByDateUnit.Day;
+
+		public override string Label
+			=> "Day".GetLocalizedResource();
+
+		public override string Description
+			=> "GroupByDateCreatedDayDescription".GetLocalizedResource();
+	}
+
+	internal sealed class GroupByDateDeletedYearAction : GroupByDateAction
 	{
 		protected override GroupOption GroupOption
 			=> GroupOption.DateDeleted;
@@ -277,7 +308,7 @@ namespace Files.App.Actions
 			=> pageType is ContentPageTypes.RecycleBin;
 	}
 
-	internal class GroupByDateDeletedMonthAction : GroupByDateAction
+	internal sealed class GroupByDateDeletedMonthAction : GroupByDateAction
 	{
 		protected override GroupOption GroupOption
 			=> GroupOption.DateDeleted;
@@ -290,6 +321,24 @@ namespace Files.App.Actions
 
 		public override string Description
 			=> "GroupByDateDeletedMonthDescription".GetLocalizedResource();
+
+		protected override bool GetIsExecutable(ContentPageTypes pageType)
+			=> pageType is ContentPageTypes.RecycleBin;
+	}
+
+	internal sealed class GroupByDateDeletedDayAction : GroupByDateAction
+	{
+		protected override GroupOption GroupOption
+			=> GroupOption.DateDeleted;
+
+		protected override GroupByDateUnit GroupByDateUnit
+			=> GroupByDateUnit.Day;
+
+		public override string Label
+			=> "Day".GetLocalizedResource();
+
+		public override string Description
+			=> "GroupByDateDeletedDayDescription".GetLocalizedResource();
 
 		protected override bool GetIsExecutable(ContentPageTypes pageType)
 			=> pageType is ContentPageTypes.RecycleBin;
@@ -325,10 +374,11 @@ namespace Files.App.Actions
 			DisplayContext.PropertyChanged += DisplayContext_PropertyChanged;
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
 			DisplayContext.GroupOption = GroupOption;
 			DisplayContext.GroupByDateUnit = GroupByDateUnit;
+			LayoutHelpers.UpdateOpenTabsPreferences();
 
 			return Task.CompletedTask;
 		}
@@ -351,7 +401,7 @@ namespace Files.App.Actions
 		}
 	}
 
-	internal class GroupAscendingAction : ObservableObject, IToggleAction
+	internal sealed class GroupAscendingAction : ObservableObject, IToggleAction
 	{
 		private readonly IDisplayPageContext context;
 
@@ -374,9 +424,10 @@ namespace Files.App.Actions
 			context.PropertyChanged += Context_PropertyChanged;
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
 			context.GroupDirection = SortDirection.Ascending;
+			LayoutHelpers.UpdateOpenTabsPreferences();
 
 			return Task.CompletedTask;
 		}
@@ -395,7 +446,7 @@ namespace Files.App.Actions
 		}
 	}
 
-	internal class GroupDescendingAction : ObservableObject, IToggleAction
+	internal sealed class GroupDescendingAction : ObservableObject, IToggleAction
 	{
 		private readonly IDisplayPageContext context;
 
@@ -418,9 +469,10 @@ namespace Files.App.Actions
 			context.PropertyChanged += Context_PropertyChanged;
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
 			context.GroupDirection = SortDirection.Descending;
+			LayoutHelpers.UpdateOpenTabsPreferences();
 
 			return Task.CompletedTask;
 		}
@@ -439,7 +491,7 @@ namespace Files.App.Actions
 		}
 	}
 
-	internal class ToggleGroupDirectionAction : IAction
+	internal sealed class ToggleGroupDirectionAction : IAction
 	{
 		private readonly IDisplayPageContext context;
 
@@ -454,15 +506,16 @@ namespace Files.App.Actions
 			context = Ioc.Default.GetRequiredService<IDisplayPageContext>();
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
 			context.GroupDirection = context.SortDirection is SortDirection.Descending ? SortDirection.Ascending : SortDirection.Descending;
+			LayoutHelpers.UpdateOpenTabsPreferences();
 
 			return Task.CompletedTask;
 		}
 	}
 
-	internal class GroupByYearAction : ObservableObject, IToggleAction
+	internal sealed class GroupByYearAction : ObservableObject, IToggleAction
 	{
 		private readonly IDisplayPageContext context;
 
@@ -485,9 +538,10 @@ namespace Files.App.Actions
 			context.PropertyChanged += Context_PropertyChanged;
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
 			context.GroupByDateUnit = GroupByDateUnit.Year;
+			LayoutHelpers.UpdateOpenTabsPreferences();
 
 			return Task.CompletedTask;
 		}
@@ -506,7 +560,7 @@ namespace Files.App.Actions
 		}
 	}
 
-	internal class GroupByMonthAction : ObservableObject, IToggleAction
+	internal sealed class GroupByMonthAction : ObservableObject, IToggleAction
 	{
 		private readonly IDisplayPageContext context;
 
@@ -529,9 +583,10 @@ namespace Files.App.Actions
 			context.PropertyChanged += Context_PropertyChanged;
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
 			context.GroupByDateUnit = GroupByDateUnit.Month;
+			LayoutHelpers.UpdateOpenTabsPreferences();
 
 			return Task.CompletedTask;
 		}
@@ -550,7 +605,7 @@ namespace Files.App.Actions
 		}
 	}
 
-	internal class ToggleGroupByDateUnitAction : IAction
+	internal sealed class ToggleGroupByDateUnitAction : IAction
 	{
 		private readonly IDisplayPageContext context;
 
@@ -565,9 +620,15 @@ namespace Files.App.Actions
 			context = Ioc.Default.GetRequiredService<IDisplayPageContext>();
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
-			context.GroupByDateUnit = context.GroupByDateUnit is GroupByDateUnit.Month ? GroupByDateUnit.Year : GroupByDateUnit.Month;
+			context.GroupByDateUnit = context.GroupByDateUnit switch
+			{
+				GroupByDateUnit.Year => GroupByDateUnit.Month,
+				GroupByDateUnit.Month => GroupByDateUnit.Day,
+				_ => GroupByDateUnit.Year
+			};
+			LayoutHelpers.UpdateOpenTabsPreferences();
 
 			return Task.CompletedTask;
 		}

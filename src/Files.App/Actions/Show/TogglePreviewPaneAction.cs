@@ -1,44 +1,44 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Actions
 {
-	internal class TogglePreviewPaneAction : ObservableObject, IToggleAction
+	internal sealed class TogglePreviewPaneAction : ObservableObject, IAction
 	{
-		private readonly PreviewPaneViewModel viewModel;
+		private readonly InfoPaneViewModel infoPaneViewModel = Ioc.Default.GetRequiredService<InfoPaneViewModel>();
+		private readonly IInfoPaneSettingsService infoPaneSettingsService = Ioc.Default.GetRequiredService<IInfoPaneSettingsService>();
 
 		public string Label
-			=> "TogglePreviewPane".GetLocalizedResource();
+			=> Strings.TogglePreviewPane.GetLocalizedResource();
 
 		public string Description
-			=> "TogglePreviewPaneDescription".GetLocalizedResource();
+			=> Strings.TogglePreviewPaneDescription.GetLocalizedResource();
 
 		public RichGlyph Glyph
-			=> new(opacityStyle: "ColorIconRightPane");
+			=> new(themedIconStyle: "App.ThemedIcons.PanelRight");
 
-		public HotKey HotKey
-			=> new(Keys.P, KeyModifiers.Ctrl);
+		public bool IsAccessibleGlobally
+			=> false;
 
-		public bool IsOn
-			=> viewModel.IsEnabled;
+		public bool IsExecutable
+			=> infoPaneViewModel.IsEnabled;
 
 		public TogglePreviewPaneAction()
 		{
-			viewModel = Ioc.Default.GetRequiredService<PreviewPaneViewModel>();
-			viewModel.PropertyChanged += ViewModel_PropertyChanged;
+			infoPaneViewModel.PropertyChanged += ViewModel_PropertyChanged;
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
-			viewModel.IsEnabled = !IsOn;
+			infoPaneSettingsService.SelectedTab = InfoPaneTabs.Preview;
 
 			return Task.CompletedTask;
 		}
 
 		private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
 		{
-			if (e.PropertyName is nameof(PreviewPaneViewModel.IsEnabled))
-				OnPropertyChanged(nameof(IsOn));
+			if (e.PropertyName is nameof(InfoPaneViewModel.IsEnabled))
+				OnPropertyChanged(nameof(IsExecutable));
 		}
 	}
 }

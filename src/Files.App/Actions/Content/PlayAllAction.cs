@@ -1,11 +1,11 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Files.Shared.Helpers;
 
 namespace Files.App.Actions
 {
-	internal class PlayAllAction : ObservableObject, IAction
+	internal sealed class PlayAllAction : ObservableObject, IAction
 	{
 		private readonly IContentPageContext context;
 
@@ -30,9 +30,9 @@ namespace Files.App.Actions
 			context.PropertyChanged += Context_PropertyChanged;
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
-			return NavigationHelpers.OpenSelectedItems(context.ShellPage!);
+			return NavigationHelpers.OpenSelectedItemsAsync(context.ShellPage!);
 		}
 
 		private void Context_PropertyChanged(object? sender, PropertyChangedEventArgs e)

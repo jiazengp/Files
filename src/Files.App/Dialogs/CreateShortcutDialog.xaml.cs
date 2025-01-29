@@ -1,8 +1,9 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Files.App.ViewModels.Dialogs;
-using Files.Core.ViewModels.Dialogs;
+using Files.App.ViewModels.Dialogs;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Data;
 
@@ -10,6 +11,9 @@ namespace Files.App.Dialogs
 {
 	public sealed partial class CreateShortcutDialog : ContentDialog, IDialog<CreateShortcutDialogViewModel>
 	{
+		private FrameworkElement RootAppElement
+			=> (FrameworkElement)MainWindow.Instance.Content;
+
 		public CreateShortcutDialogViewModel ViewModel
 		{
 			get => (CreateShortcutDialogViewModel)DataContext;
@@ -23,7 +27,7 @@ namespace Files.App.Dialogs
 
 			InvalidPathWarning.SetBinding(TeachingTip.TargetProperty, new Binding()
 			{
-				Source = DestinationItemPath
+				Source = ShortcutTarget
 			});
 		}
 

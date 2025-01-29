@@ -1,9 +1,9 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Actions
 {
-	internal class RefreshItemsAction : ObservableObject, IAction
+	internal sealed class RefreshItemsAction : ObservableObject, IAction
 	{
 		private readonly IContentPageContext context;
 
@@ -32,9 +32,12 @@ namespace Files.App.Actions
 			context.PropertyChanged += Context_PropertyChanged;
 		}
 
-		public async Task ExecuteAsync()
+		public async Task ExecuteAsync(object? parameter = null)
 		{
-			context.ShellPage?.Refresh_Click();
+			if (context.ShellPage is null)
+				return;
+
+			await context.ShellPage.Refresh_Click();
 		}
 
 		private void Context_PropertyChanged(object? sender, PropertyChangedEventArgs e)

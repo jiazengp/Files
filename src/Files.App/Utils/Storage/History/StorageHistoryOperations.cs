@@ -1,15 +1,15 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using System.IO;
 using Windows.Storage;
 
 namespace Files.App.Utils.Storage
 {
-	public class StorageHistoryOperations : IStorageHistoryOperations
+	public sealed class StorageHistoryOperations : IStorageHistoryOperations
 	{
 		private IFilesystemHelpers helpers;
-		private IFilesystemOperations operations;
+		private ShellFilesystemOperations operations;
 
 		private readonly CancellationToken cancellationToken;
 
@@ -23,7 +23,7 @@ namespace Files.App.Utils.Storage
 		public async Task<ReturnResult> Undo(IStorageHistory history)
 		{
 			ReturnResult returnStatus = ReturnResult.InProgress;
-			Progress<FileSystemProgress> progress = new();
+			Progress<StatusCenterItemProgressModel> progress = new();
 
 			progress.ProgressChanged += (s, e) => returnStatus = e.Status!.Value.ToStatus();
 
@@ -47,7 +47,7 @@ namespace Files.App.Utils.Storage
 					if (!IsHistoryNull(history))
 					{
 						NameCollisionOption collision = NameCollisionOption.GenerateUniqueName;
-						for (int i = 0; i < history.Destination.Count(); i++)
+						for (int i = 0; i < history.Destination.Count; i++)
 						{
 							string name = Path.GetFileName(history.Source[i].Path);
 							await operations.RenameAsync(history.Destination[i], name, collision, progress, cancellationToken);
@@ -107,7 +107,7 @@ namespace Files.App.Utils.Storage
 		public async Task<ReturnResult> Redo(IStorageHistory history)
 		{
 			ReturnResult returnStatus = ReturnResult.InProgress;
-			Progress<FileSystemProgress> progress = new();
+			Progress<StatusCenterItemProgressModel> progress = new();
 
 			progress.ProgressChanged += (s, e) => { returnStatus = e.Status!.Value.ToStatus(); };
 

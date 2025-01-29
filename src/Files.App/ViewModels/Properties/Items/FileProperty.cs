@@ -1,10 +1,10 @@
-// Copyright(c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright(c) Files Community
+// Licensed under the MIT License.
 
 using Files.App.Converters;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Data;
-using System.Text.Json;
+using System.Collections.Concurrent;
 using Windows.Storage;
 
 namespace Files.App.ViewModels.Properties
@@ -12,7 +12,7 @@ namespace Files.App.ViewModels.Properties
 	/// <summary>
 	/// This class is represents a system file property from the Windows.Storage API
 	/// </summary>
-	public class FileProperty : ObservableObject
+	public sealed class FileProperty : ObservableObject
 	{
 		/// <summary>
 		/// The name to display
@@ -163,8 +163,10 @@ namespace Files.App.ViewModels.Properties
 				return Task.CompletedTask;
 			}
 
-			var propsToSave = new Dictionary<string, object>();
-			propsToSave.Add(Property, Converter.ConvertBack(Value, null, null, null));
+			var propsToSave = new Dictionary<string, object>
+			{
+				{ Property, Converter.ConvertBack(Value, null, null, null) }
+			};
 
 			return file.Properties.SavePropertiesAsync(propsToSave).AsTask();
 		}
@@ -217,7 +219,7 @@ namespace Files.App.ViewModels.Properties
 		/// Converts the property to a string to be displayed
 		/// </summary>
 		/// <returns></returns>
-		private string ConvertToString()
+		private string? ConvertToString()
 		{
 			// Don't attempt any convert null values
 			if (Value is null)
@@ -227,13 +229,27 @@ namespace Files.App.ViewModels.Properties
 
 			if (EnumeratedList is not null)
 			{
-				var value = "";
-				return EnumeratedList.TryGetValue(Convert.ToInt32(Value), out value) ? value.GetLocalizedResource() : null;
+				try
+				{
+					return EnumeratedList.TryGetValue(Convert.ToInt32(Value), out var value) ?
+						value.GetLocalizedResource() : null;
+				}
+				catch
+				{
+					return null;
+				}
 			}
 
 			if (DisplayFunction is not null)
 			{
-				return DisplayFunction.Invoke(Value);
+				try
+				{
+					return DisplayFunction.Invoke(Value);
+				}
+				catch
+				{
+					return null;
+				}
 			}
 
 			if (Converter is not null)
@@ -259,7 +275,7 @@ namespace Files.App.ViewModels.Properties
 			return value;
 		}
 
-		private static Dictionary<string, string> cachedPropertiesListFiles = new Dictionary<string, string>();
+		private static ConcurrentDictionary<string, string> cachedPropertiesListFiles = [];
 
 		/// <summary>
 		/// This function retrieves the list of properties to display from the PropertiesInformation.json
@@ -305,7 +321,7 @@ namespace Files.App.ViewModels.Properties
 				{
 					if (file.Properties is not null)
 					{
-						val = (await file.Properties.RetrievePropertiesAsync(new string[] { prop })).First().Value;
+						val = (await file.Properties.RetrievePropertiesAsync([prop])).First().Value;
 					}
 				}
 				catch (ArgumentException e)
@@ -347,9 +363,22 @@ namespace Files.App.ViewModels.Properties
 			{ "AddISO" , input => $"ISO-{(UInt16)input}"},
 			{ "RoundDouble" , input => $"{Math.Round((double)input)}"},
 			{ "UnitMM" , input => $"{(double)input} mm"},
+			{ "FormatEncodingBitrate", FormatEncodingBitrate }
 		};
 
 		private static string TimeSpanToString(TimeSpan t)
 			=> t.Days > 0 ? (t.Days * 24 + t.Hours) + t.ToString("':'mm':'ss") : t.ToString("hh':'mm':'ss");
+
+		private static string FormatEncodingBitrate(object input)
+		{
+			// For cases when multiple files are selected and it has a string value
+			if (input.GetType() != typeof(uint))
+				return input?.ToString() ?? string.Empty;
+
+			var sizes = new string[] { "bps", "kbps", "Mbps", "Gbps" };
+			var order = (int)Math.Floor(Math.Log((uint)input, 1000));
+			var readableSpeed = (uint)input / Math.Pow(1000, order);
+			return $"{readableSpeed:0.##} {sizes[order]}";
+		}
 	}
 }

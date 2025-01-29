@@ -1,5 +1,5 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Foundation;
@@ -9,7 +9,7 @@ using Windows.Storage.Search;
 
 namespace Files.App.Utils.Storage
 {
-	public class VirtualStorageFolder : BaseStorageFolder
+	public sealed class VirtualStorageFolder : BaseStorageFolder
 	{
 		public override string Path { get; }
 		public override string Name { get; }
@@ -87,6 +87,8 @@ namespace Files.App.Utils.Storage
 			=> CreateFolderAsync(desiredName, CreationCollisionOption.FailIfExists);
 		public override IAsyncOperation<BaseStorageFolder> CreateFolderAsync(string desiredName, CreationCollisionOption options)
 			=> throw new NotSupportedException();
+		public override IAsyncOperation<BaseStorageFolder> MoveAsync(IStorageFolder destinationFolder) => throw new NotSupportedException();
+		public override IAsyncOperation<BaseStorageFolder> MoveAsync(IStorageFolder destinationFolder, NameCollisionOption option) => throw new NotSupportedException();
 
 		public override IAsyncAction RenameAsync(string desiredName)
 			=> RenameAsync(desiredName, NameCollisionOption.FailIfExists);

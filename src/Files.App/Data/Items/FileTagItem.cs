@@ -1,9 +1,7 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using CommunityToolkit.WinUI.Helpers;
-using Files.App.Converters;
-using Files.Core.ViewModels.FileTags;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Markup;
@@ -11,7 +9,7 @@ using Microsoft.UI.Xaml.Media;
 
 namespace Files.App.Data.Items
 {
-	public class FileTagItem : ObservableObject, INavigationControlItem
+	public sealed class FileTagItem : ObservableObject, INavigationControlItem
 	{
 		public string Text { get; set; }
 
@@ -47,7 +45,7 @@ namespace Files.App.Data.Items
 		{
 			get => new PathIconSource()
 			{
-				Data = (Geometry)XamlBindingHelper.ConvertValue(typeof(Geometry), (string)Application.Current.Resources["ColorIconFilledTag"]),
+				Data = (Geometry)XamlBindingHelper.ConvertValue(typeof(Geometry), (string)Application.Current.Resources["App.Theme.PathIcon.FilledTag"]),
 				Foreground = new SolidColorBrush(FileTag.Color.ToColor())
 			};
 		}

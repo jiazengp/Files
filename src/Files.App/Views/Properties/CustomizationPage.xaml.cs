@@ -1,5 +1,5 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Files.App.Data.Parameters;
 using Files.App.ViewModels.Properties;
@@ -22,10 +22,10 @@ namespace Files.App.Views.Properties
 
 			base.OnNavigatedTo(e);
 
-			CustomizationViewModel = new(AppInstance, BaseProperties, parameter.AppWindow);
+			CustomizationViewModel = new(AppInstance, BaseProperties, parameter.Window.AppWindow);
 		}
 
-		public async override Task<bool> SaveChangesAsync()
+		public override async Task<bool> SaveChangesAsync()
 			=> await CustomizationViewModel.UpdateIcon();
 
 		public override void Dispose()

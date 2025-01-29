@@ -1,21 +1,21 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Microsoft.UI.Xaml;
 
 namespace Files.App.Data.Items
 {
-	public class NavigationViewItemButtonStyleItem : ObservableObject
+	public sealed class NavigationViewItemButtonStyleItem : ObservableObject
 	{
 		public string? Name;
 
 		public PropertiesNavigationViewItemType ItemType;
 
-		private Style _OpacityIconStyle = (Style)Application.Current.Resources["ColorIconGeneralProperties"];
-		public Style OpacityIconStyle
+		private Style _ThemedIconStyle = (Style)Application.Current.Resources["App.ThemedIcons.Properties"];
+		public Style ThemedIconStyle
 		{
-			get => _OpacityIconStyle;
-			set => SetProperty(ref _OpacityIconStyle, value);
+			get => _ThemedIconStyle;
+			set => SetProperty(ref _ThemedIconStyle, value);
 		}
 
 		private bool _IsSelected;

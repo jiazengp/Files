@@ -1,4 +1,4 @@
-﻿<!--  Copyright (c) 2023 Files Community. Licensed under the MIT License. See the LICENSE.  -->
+﻿<!--  Copyright (c) Files Community. Licensed under the MIT License.  -->
 <ContentDialog
 	x:Class="Files.App.Dialogs.ReleaseNotesDialog"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -7,18 +7,21 @@
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
 	xmlns:helpers="using:Files.App.Helpers"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	Closing="ContentDialog_Closing"
 	CornerRadius="{StaticResource OverlayCornerRadius}"
 	DefaultButton="None"
-	RequestedTheme="{x:Bind helpers:ThemeHelper.RootTheme}"
+	HighContrastAdjustment="None"
+	RequestedTheme="{x:Bind RootAppElement.RequestedTheme, Mode=OneWay}"
 	Style="{StaticResource DefaultContentDialogStyle}"
 	mc:Ignorable="d">
 	<ContentDialog.Resources>
 		<ResourceDictionary>
 			<Thickness x:Key="ContentDialogPadding">0</Thickness>
+			<x:Double x:Key="ContentDialogMaxWidth">1100</x:Double>
 		</ResourceDictionary>
 	</ContentDialog.Resources>
 
-	<Grid>
+	<Grid x:Name="ContainerGrid">
 		<Grid.RowDefinitions>
 			<RowDefinition Height="Auto" />
 			<RowDefinition Height="*" />
@@ -58,25 +61,20 @@
 			</Button>
 		</Grid>
 
-		<!--  Markdown Content  -->
-		<ScrollViewer
+		<!--  WebView  -->
+		<WebView2
+			x:Name="BlogPostWebView"
 			Grid.Row="1"
-			MinWidth="440"
-			MinHeight="200"
-			Padding="20,0,20,20"
-			HorizontalScrollMode="Auto"
-			VerticalScrollMode="Auto">
-			<controls:MarkdownTextBlock
-				Background="Transparent"
-				ListGutterWidth="16"
-				Text="{x:Bind ViewModel.ReleaseNotesMadrkdown, Mode=OneWay}" />
-		</ScrollViewer>
+			HorizontalAlignment="Stretch"
+			VerticalAlignment="Stretch"
+			CoreWebView2Initialized="BlogPostWebView_CoreWebView2Initialized"
+			Source="{x:Bind ViewModel.BlogPostUrl, Mode=OneWay}" />
 
 		<!--  Footer  -->
 		<Border
 			Grid.Row="2"
 			Padding="12"
-			Background="{ThemeResource SolidBackgroundFillColorBase}"
+			Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
 			BackgroundSizing="OuterBorderEdge"
 			BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
 			BorderThickness="0,1,0,0">

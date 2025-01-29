@@ -1,12 +1,12 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Microsoft.UI.Xaml.Media;
 using System.Runtime.CompilerServices;
 
 namespace Files.App.Utils.Storage
 {
-	public class GroupedHeaderViewModel : ObservableObject
+	public sealed class GroupedHeaderViewModel : ObservableObject
 	{
 		public string Key { get; set; }
 		public bool Initialized { get; set; }
@@ -103,7 +103,7 @@ namespace Files.App.Utils.Storage
 			}
 		}
 
-		private List<string> changedPropQueue = new List<string>();
+		private List<string> changedPropQueue = [];
 
 		// This is true by default to make it easier to initialize groups from a different thread
 		private bool deferPropChangedNotifs = true;

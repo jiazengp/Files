@@ -1,11 +1,11 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Windows.Graphics.Imaging;
 
 namespace Files.App.Actions
 {
-	internal class RotateLeftAction : BaseRotateAction
+	internal sealed class RotateLeftAction : BaseRotateAction
 	{
 		public override string Label
 			=> "RotateLeft".GetLocalizedResource();
@@ -14,7 +14,7 @@ namespace Files.App.Actions
 			=> "RotateLeftDescription".GetLocalizedResource();
 
 		public override RichGlyph Glyph
-			=> new(opacityStyle: "ColorIconRotateLeft");
+			=> new(themedIconStyle: "App.ThemedIcons.ImageRotate.ACW");
 
 		protected override BitmapRotation Rotation
 			=> BitmapRotation.Clockwise270Degrees;

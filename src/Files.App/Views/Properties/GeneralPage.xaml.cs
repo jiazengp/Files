@@ -1,22 +1,20 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Files.App.ViewModels.Properties;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
 using System.IO;
-using System.Text.RegularExpressions;
 using Windows.Storage;
-using Microsoft.UI.Dispatching;
+using Windows.Win32;
+using Files.App.Helpers;
 
 namespace Files.App.Views.Properties
 {
 	public sealed partial class GeneralPage : BasePropertiesPage
 	{
-		private readonly Regex letterRegex = new(@"\s*\(\w:\)$");
-
 		private readonly DispatcherQueueTimer _updateDateDisplayTimer;
-
 		public GeneralPage()
 		{
 			InitializeComponent();
@@ -29,7 +27,7 @@ namespace Files.App.Views.Properties
 
 		private void ItemFileName_GettingFocus(UIElement _, GettingFocusEventArgs e)
 		{
-			ItemFileName.Text = letterRegex.Replace(ItemFileName.Text, string.Empty);
+			ItemFileName.Text = RegexHelpers.DriveLetter().Replace(ItemFileName.Text, string.Empty);
 		}
 
 		private void ItemFileName_LosingFocus(UIElement _, LosingFocusEventArgs e)
@@ -40,19 +38,16 @@ namespace Files.App.Views.Properties
 				return;
 			}
 
-			var match = letterRegex.Match(ViewModel.OriginalItemName);
+			var match = RegexHelpers.DriveLetter().Match(ViewModel.OriginalItemName);
 			if (match.Success)
 				ItemFileName.Text += match.Value;
 		}
 
-		private void DiskCleanupButton_Click(object _, RoutedEventArgs e)
-		{
-			if (BaseProperties is DriveProperties driveProps)
-				StorageSenseHelper.OpenStorageSense(driveProps.Drive.Path);
-		}
-
 		private void UpdateDateDisplayTimer_Tick(object sender, object e)
 		{
+			if (App.AppModel.PropertiesWindowCount == 0)
+				return;
+
 			// Reassign values to update date display
 			ViewModel.ItemCreatedTimestampReal = ViewModel.ItemCreatedTimestampReal;
 			ViewModel.ItemModifiedTimestampReal = ViewModel.ItemModifiedTimestampReal;
@@ -85,16 +80,16 @@ namespace Files.App.Views.Properties
 
 			bool SaveDrive(DriveItem drive)
 			{
-				var fsVM = AppInstance.FilesystemViewModel;
+				var fsVM = AppInstance.ShellViewModel;
 				if (!GetNewName(out var newName) || fsVM is null)
 					return false;
 
-				newName = letterRegex.Replace(newName, string.Empty); // Remove "(C:)" from the new label
+				newName = RegexHelpers.DriveLetter().Replace(newName, string.Empty); // Remove "(C:)" from the new label
 
 				if (drive.Type == Data.Items.DriveType.Network)
-					Win32API.SetNetworkDriveLabel(drive.DeviceID, newName);
+					Win32Helper.SetNetworkDriveLabel(drive.DeviceID, newName);
 				else
-					Win32API.SetVolumeLabel(drive.Path, newName);
+					Win32Helper.SetVolumeLabel(drive.Path, newName);
 
 				_ = MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(async () =>
 				{
@@ -106,7 +101,7 @@ namespace Files.App.Views.Properties
 
 			async Task<bool> SaveLibraryAsync(LibraryItem library)
 			{
-				var fsVM = AppInstance.FilesystemViewModel;
+				var fsVM = AppInstance.ShellViewModel;
 				if (!GetNewName(out var newName) || fsVM is null || !App.LibraryManager.CanCreateLibrary(newName).result)
 					return false;
 
@@ -135,9 +130,27 @@ namespace Files.App.Views.Properties
 				{
 					foreach (var fileOrFolder in fileOrFolders)
 					{
-						await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() =>
-							UIFilesystemHelpers.SetHiddenAttributeItem(fileOrFolder, ViewModel.IsHidden, itemMM)
-						);
+						if (ViewModel.IsHiddenEditedValue is not null)
+						{
+							var isHiddenEditedValue = (bool)ViewModel.IsHiddenEditedValue;
+							await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() =>
+								UIFilesystemHelpers.SetHiddenAttributeItem(fileOrFolder, isHiddenEditedValue, itemMM)
+							);
+							ViewModel.IsHidden = isHiddenEditedValue;
+						}
+
+						ViewModel.IsReadOnly = ViewModel.IsReadOnlyEditedValue;
+						ViewModel.IsContentCompressed = ViewModel.IsContentCompressedEditedValue;
+
+						if (ViewModel.IsAblumCoverModified)
+						{
+							MediaFileHelper.ChangeAlbumCover(fileOrFolder.ItemPath, ViewModel.ModifiedAlbumCover);
+
+							await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() =>
+							{
+								AppInstance?.ShellViewModel?.RefreshItems(null);
+							});
+						}
 					}
 				}
 				return true;
@@ -147,12 +160,29 @@ namespace Files.App.Views.Properties
 			{
 				// Handle the visibility attribute for a single file
 				var itemMM = AppInstance?.SlimContentPage?.ItemManipulationModel;
-				if (itemMM is not null) // null on homepage
+				if (itemMM is not null && ViewModel.IsHiddenEditedValue is not null) // null on homepage
 				{
 					await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() =>
-						UIFilesystemHelpers.SetHiddenAttributeItem(item, ViewModel.IsHidden, itemMM)
+						UIFilesystemHelpers.SetHiddenAttributeItem(item, (bool)ViewModel.IsHiddenEditedValue, itemMM)
 					);
 				}
+
+				if (ViewModel.IsUnblockFileSelected)
+					PInvoke.DeleteFileFromApp($"{item.ItemPath}:Zone.Identifier");
+
+				if (ViewModel.IsAblumCoverModified)
+				{
+					MediaFileHelper.ChangeAlbumCover(item.ItemPath, ViewModel.ModifiedAlbumCover);
+
+					await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() =>
+					{
+						AppInstance?.ShellViewModel?.RefreshItems(null);
+					});
+				}
+
+				ViewModel.IsReadOnly = ViewModel.IsReadOnlyEditedValue;
+				ViewModel.IsHidden = ViewModel.IsHiddenEditedValue;
+				ViewModel.IsContentCompressed = ViewModel.IsContentCompressedEditedValue;
 
 				if (!GetNewName(out var newName))
 					return true;

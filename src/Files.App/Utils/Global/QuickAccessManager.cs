@@ -1,8 +1,7 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
-using Files.App.Services;
-using Files.App.UserControls.Widgets;
+using CommunityToolkit.WinUI.Helpers;
 using System.IO;
 
 namespace Files.App.Utils
@@ -12,27 +11,26 @@ namespace Files.App.Utils
 		public FileSystemWatcher? PinnedItemsWatcher;
 
 		public event FileSystemEventHandler? PinnedItemsModified;
-		
+
 		public EventHandler<ModifyQuickAccessEventArgs>? UpdateQuickAccessWidget;
 
 		public IQuickAccessService QuickAccessService;
 
-		public SidebarPinnedModel Model;
+		public PinnedFoldersManager Model;
 		public QuickAccessManager()
 		{
 			QuickAccessService = Ioc.Default.GetRequiredService<IQuickAccessService>();
 			Model = new();
 			Initialize();
 		}
-		
+
 		public void Initialize()
 		{
 			PinnedItemsWatcher = new()
 			{
 				Path = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Microsoft", "Windows", "Recent", "AutomaticDestinations"),
 				Filter = "f01b4d95cf55d32a.automaticDestinations-ms",
-				NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite | NotifyFilters.FileName,
-				EnableRaisingEvents = true
+				NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite | NotifyFilters.FileName
 			};
 
 			PinnedItemsWatcher.Changed += PinnedItemsWatcher_Changed;
@@ -45,8 +43,8 @@ namespace Files.App.Utils
 		{
 			PinnedItemsModified += Model.LoadAsync;
 
-			//if (!Model.FavoriteItems.Contains(Constants.UserEnvironmentPaths.RecycleBinPath) && SystemInformation.Instance.IsFirstRun)
-			//	await QuickAccessService.PinToSidebar(Constants.UserEnvironmentPaths.RecycleBinPath);
+			if (!Model.PinnedFolders.Contains(Constants.UserEnvironmentPaths.RecycleBinPath) && SystemInformation.Instance.IsFirstRun)
+				await QuickAccessService.PinToSidebarAsync(Constants.UserEnvironmentPaths.RecycleBinPath);
 
 			await Model.LoadAsync();
 		}

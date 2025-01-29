@@ -1,9 +1,9 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using CommunityToolkit.WinUI.Helpers;
-using Files.Core.Services;
-using Files.Core.Services.Settings;
+using Files.App.Services;
+using Files.App.Services.Settings;
 using System;
 
 namespace Files.App.Helpers
@@ -15,30 +15,96 @@ namespace Files.App.Helpers
 		/// </summary>
 		public static void LoadAppResources(this IResourcesService service, IAppearanceSettingsService appearance)
 		{
-			var useCompactStyles = appearance.UseCompactStyles;
-			var appThemeBackgroundColor = ColorHelper.ToColor(appearance.AppThemeBackgroundColor);
+			var appThemeBackgroundColor = appearance.AppThemeBackgroundColor;
 			var appThemeAddressBarBackgroundColor = appearance.AppThemeAddressBarBackgroundColor;
+			var appThemeToolbarBackgroundColor = appearance.AppThemeToolbarBackgroundColor;
 			var appThemeSidebarBackgroundColor = appearance.AppThemeSidebarBackgroundColor;
 			var appThemeFileAreaBackgroundColor = appearance.AppThemeFileAreaBackgroundColor;
+			var appThemeFileAreaSecondaryBackgroundColor = appearance.AppThemeFileAreaSecondaryBackgroundColor;
+			var appThemeInfoPaneBackgroundColor = appearance.AppThemeInfoPaneBackgroundColor;
 			var appThemeFontFamily = appearance.AppThemeFontFamily;
 
-			service.SetCompactSpacing(useCompactStyles);
-			service.SetAppThemeBackgroundColor(appThemeBackgroundColor.FromWindowsColor());
+			try
+			{
+				service.SetAppThemeBackgroundColor(ColorHelper.ToColor(appThemeBackgroundColor).FromWindowsColor());
+			}
+			catch
+			{
+				appearance.AppThemeBackgroundColor = "#00000000"; // reset to default
+				service.SetAppThemeBackgroundColor(ColorHelper.ToColor("#00000000").FromWindowsColor());
+			}
 
-			if (!string.IsNullOrWhiteSpace(appThemeAddressBarBackgroundColor) && appThemeAddressBarBackgroundColor != "#00000000")
-				service.SetAppThemeAddressBarBackgroundColor(ColorHelper.ToColor(appThemeAddressBarBackgroundColor).FromWindowsColor());
-			else
-				appearance.AppThemeAddressBarBackgroundColor = ""; //migrate to new default
+			if (!string.IsNullOrWhiteSpace(appThemeAddressBarBackgroundColor))
+			{
+				try
+				{
+					service.SetAppThemeAddressBarBackgroundColor(ColorHelper.ToColor(appThemeAddressBarBackgroundColor).FromWindowsColor());
+				}
+				catch
+				{
+					appearance.AppThemeAddressBarBackgroundColor = ""; // reset to default
+				}
+			}
 
-			if (!string.IsNullOrWhiteSpace(appThemeSidebarBackgroundColor) && appThemeAddressBarBackgroundColor != "#00000000")
-				service.SetAppThemeSidebarBackgroundColor(ColorHelper.ToColor(appThemeSidebarBackgroundColor).FromWindowsColor());
-			else
-				appearance.AppThemeSidebarBackgroundColor = ""; //migrate to new default
+			if (!string.IsNullOrWhiteSpace(appThemeToolbarBackgroundColor))
+			{
+				try
+				{
+					service.SetAppThemeToolbarBackgroundColor(ColorHelper.ToColor(appThemeToolbarBackgroundColor).FromWindowsColor());
+				}
+				catch
+				{
+					appearance.AppThemeAddressBarBackgroundColor = ""; //reset to default
+				}
+			}
 
-			if (!string.IsNullOrWhiteSpace(appThemeFileAreaBackgroundColor) && appThemeAddressBarBackgroundColor != "#00000000")
-				service.SetAppThemeFileAreaBackgroundColor(ColorHelper.ToColor(appThemeFileAreaBackgroundColor).FromWindowsColor());
-			else
-				appearance.AppThemeFileAreaBackgroundColor = ""; //migrate to new default
+			if (!string.IsNullOrWhiteSpace(appThemeSidebarBackgroundColor))
+			{
+				try
+				{
+					service.SetAppThemeSidebarBackgroundColor(ColorHelper.ToColor(appThemeSidebarBackgroundColor).FromWindowsColor());
+				}
+				catch
+				{
+					appearance.AppThemeSidebarBackgroundColor = ""; //reset to default
+				}
+			}
+
+			if (!string.IsNullOrWhiteSpace(appThemeFileAreaBackgroundColor))
+			{
+				try
+				{
+					service.SetAppThemeFileAreaBackgroundColor(ColorHelper.ToColor(appThemeFileAreaBackgroundColor).FromWindowsColor());
+				}
+				catch
+				{
+					appearance.AppThemeFileAreaBackgroundColor = ""; //reset to default
+				}
+			}
+
+			if (!string.IsNullOrWhiteSpace(appThemeFileAreaSecondaryBackgroundColor))
+			{
+				try
+				{
+					service.SetAppThemeFileAreaSecondaryBackgroundColor(ColorHelper.ToColor(appThemeFileAreaSecondaryBackgroundColor).FromWindowsColor());
+				}
+				catch
+				{
+					appearance.AppThemeFileAreaSecondaryBackgroundColor = ""; //reset to default
+				}
+			}
+
+			if (!string.IsNullOrWhiteSpace(appThemeInfoPaneBackgroundColor))
+			{
+				try
+				{
+					service.SetAppThemeInfoPaneBackgroundColor(ColorHelper.ToColor(appThemeInfoPaneBackgroundColor).FromWindowsColor());
+				}
+				catch
+				{
+					appearance.AppThemeInfoPaneBackgroundColor = ""; //reset to default
+				}
+			}
 
 			if (appThemeFontFamily != Constants.Appearance.StandardFont)
 				service.SetAppThemeFontFamily(appThemeFontFamily);

@@ -1,9 +1,9 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Actions
 {
-	internal class GitPushAction : ObservableObject, IAction
+	internal sealed class GitPushAction : ObservableObject, IAction
 	{
 		private readonly IContentPageContext _context;
 
@@ -23,9 +23,9 @@ namespace Files.App.Actions
 			_context.PropertyChanged += Context_PropertyChanged;
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
-			return GitHelpers.PushToOrigin(
+			return GitHelpers.PushToOriginAsync(
 				_context.ShellPage?.InstanceViewModel.GitRepositoryPath,
 				_context.ShellPage?.InstanceViewModel.GitBranchName);
 		}

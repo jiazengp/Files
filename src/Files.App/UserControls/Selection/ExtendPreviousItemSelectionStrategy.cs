@@ -1,12 +1,12 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
 namespace Files.App.UserControls.Selection
 {
-	public class ExtendPreviousItemSelectionStrategy : ItemSelectionStrategy
+	public sealed class ExtendPreviousItemSelectionStrategy : ItemSelectionStrategy
 	{
 		private readonly List<object> prevSelectedItems;
 

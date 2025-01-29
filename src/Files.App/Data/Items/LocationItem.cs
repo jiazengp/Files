@@ -1,6 +1,7 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
+using Files.App.Controls;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -79,7 +80,7 @@ namespace Files.App.Data.Items
 
 		public bool IsInvalid { get; set; } = false;
 
-		public bool IsPinned => App.QuickAccessManager.Model.FavoriteItems.Contains(path);
+		public bool IsPinned => App.QuickAccessManager.Model.PinnedFolders.Contains(path);
 
 		public SectionType Section { get; set; }
 
@@ -101,9 +102,9 @@ namespace Files.App.Data.Items
 		{
 			get
 			{
-				if (Section == SectionType.Favorites)
+				if (Section == SectionType.Pinned)
 				{
-					return new OpacityIcon()
+					return new ThemedIcon()
 					{
 						Style = Application.Current.Resources["SidebarFavouritesPinnedIcon"] as Style
 					};
@@ -121,13 +122,20 @@ namespace Files.App.Data.Items
 		}
 	}
 
-	public class RecycleBinLocationItem : LocationItem
+	public sealed class RecycleBinLocationItem : LocationItem
 	{
-		public void RefreshSpaceUsed(object sender, FileSystemEventArgs e)
+		private readonly IStorageTrashBinService StorageTrashBinService = Ioc.Default.GetRequiredService<IStorageTrashBinService>();
+
+		public async void RefreshSpaceUsed(object? sender, FileSystemEventArgs e)
 		{
-			MainWindow.Instance.DispatcherQueue.TryEnqueue(() =>
+			await RefreshSpaceUsedAsync();
+		}
+
+		private Task RefreshSpaceUsedAsync()
+		{
+			return MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(async () =>
 			{
-				SpaceUsed = RecycleBinHelpers.GetSize();
+				SpaceUsed = await Task.Run(() => StorageTrashBinService.GetSize());
 			});
 		}
 
@@ -149,10 +157,10 @@ namespace Files.App.Data.Items
 
 		public RecycleBinLocationItem()
 		{
-			SpaceUsed = RecycleBinHelpers.GetSize();
+			StorageTrashBinService.Watcher.ItemAdded += RefreshSpaceUsed;
+			StorageTrashBinService.Watcher.ItemDeleted += RefreshSpaceUsed;
 
-			RecycleBinManager.Default.RecycleBinItemCreated += RefreshSpaceUsed;
-			RecycleBinManager.Default.RecycleBinItemDeleted += RefreshSpaceUsed;
+			_ = RefreshSpaceUsedAsync();
 		}
 	}
 }

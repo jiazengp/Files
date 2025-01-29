@@ -1,5 +1,5 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Microsoft.UI.Xaml;
 
@@ -21,6 +21,12 @@ namespace Files.App.Converters
 
 		public static Visibility OrConvertToVisibility(bool a, bool b)
 			=> (a || b) ? Visibility.Visible : Visibility.Collapsed;
+
+		public static Visibility AndConvertToVisibility(bool a, bool b)
+			=> (a && b) ? Visibility.Visible : Visibility.Collapsed;
+
+		public static Visibility NorConvertToVisibility(bool a, bool b)
+			=> !(a || b) ? Visibility.Visible : Visibility.Collapsed;
 
 		public static Visibility OrNotConvertToVisibility(bool a, bool b)
 			=> OrConvertToVisibility(a, !b);

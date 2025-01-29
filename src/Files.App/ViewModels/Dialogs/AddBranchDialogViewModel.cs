@@ -1,6 +1,6 @@
 ﻿namespace Files.App.ViewModels.Dialogs
 {
-	public class AddBranchDialogViewModel : ObservableObject
+	public sealed class AddBranchDialogViewModel : ObservableObject
 	{
 		private readonly string _repositoryPath;
 
@@ -45,13 +45,19 @@
 
 		public bool ShowWarningTip => !string.IsNullOrEmpty(_NewBranchName) && !_IsBranchValid;
 
-		public string[] Branches { get; init; }
+		public string[] Branches { get; private set; }
 
 		public AddBranchDialogViewModel(string repositoryPath, string activeBranch)
 		{
 			_repositoryPath = repositoryPath;
-			Branches = GitHelpers.GetBranchesNames(repositoryPath).Select(b => b.Name).ToArray();
 			BasedOn = activeBranch;
+			Branches = [];
+		}
+
+		public async Task LoadBranches()
+		{
+			Branches = (await GitHelpers.GetBranchesNames(_repositoryPath)).Select(b => b.Name).ToArray();
+			OnPropertyChanged(nameof(Branches));
 		}
 	}
 }

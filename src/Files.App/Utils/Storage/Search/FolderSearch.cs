@@ -1,32 +1,30 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Microsoft.Extensions.Logging;
 using System.IO;
 using Windows.Storage;
 using Windows.Storage.FileProperties;
 using Windows.Storage.Search;
-using static Files.Core.Helpers.NativeFindStorageItemHelper;
 using FileAttributes = System.IO.FileAttributes;
-using WIN32_FIND_DATA = Files.Core.Helpers.NativeFindStorageItemHelper.WIN32_FIND_DATA;
+using WIN32_FIND_DATA = Files.App.Helpers.Win32PInvoke.WIN32_FIND_DATA;
 
 namespace Files.App.Utils.Storage
 {
-	public class FolderSearch
+	public sealed class FolderSearch
 	{
 		private IUserSettingsService UserSettingsService { get; } = Ioc.Default.GetRequiredService<IUserSettingsService>();
 		private DrivesViewModel drivesViewModel = Ioc.Default.GetRequiredService<DrivesViewModel>();
-
+		private readonly IStorageTrashBinService StorageTrashBinService = Ioc.Default.GetRequiredService<IStorageTrashBinService>();
 		private readonly IFileTagsSettingsService fileTagsSettingsService = Ioc.Default.GetRequiredService<IFileTagsSettingsService>();
 
 		private const uint defaultStepSize = 500;
 
 		public string? Query { get; set; }
+
 		public string? Folder { get; set; }
 
 		public uint MaxItemCount { get; set; } = 0; // 0: no limit
-		public uint ThumbnailSize { get; set; } = 24;
-		public bool SearchUnindexedItems { get; set; } = false;
 
 		private uint UsedMaxItemCount => MaxItemCount > 0 ? MaxItemCount : uint.MaxValue;
 
@@ -75,11 +73,11 @@ namespace Files.App.Utils.Storage
 			{
 				if (App.LibraryManager.TryGetLibrary(Folder, out var library))
 				{
-					return AddItemsAsyncForLibrary(library, results, token);
+					return AddItemsForLibraryAsync(library, results, token);
 				}
 				else if (Folder == "Home")
 				{
-					return AddItemsAsyncForHome(results, token);
+					return AddItemsForHomeAsync(results, token);
 				}
 				else
 				{
@@ -94,7 +92,7 @@ namespace Files.App.Utils.Storage
 			return Task.CompletedTask;
 		}
 
-		private async Task AddItemsAsyncForHome(IList<ListedItem> results, CancellationToken token)
+		private async Task AddItemsForHomeAsync(IList<ListedItem> results, CancellationToken token)
 		{
 			if (AQSQuery.StartsWith("tag:", StringComparison.Ordinal))
 			{
@@ -102,7 +100,7 @@ namespace Files.App.Utils.Storage
 			}
 			else
 			{
-				foreach (var drive in drivesViewModel.Drives.Cast<DriveItem>().Where(x => !x.IsNetwork))
+				foreach (var drive in drivesViewModel.Drives.ToList().Cast<DriveItem>().Where(x => !x.IsNetwork))
 				{
 					await AddItemsAsync(drive.Path, results, token);
 				}
@@ -111,17 +109,17 @@ namespace Files.App.Utils.Storage
 
 		public async Task<ObservableCollection<ListedItem>> SearchAsync()
 		{
-			ObservableCollection<ListedItem> results = new ObservableCollection<ListedItem>();
+			ObservableCollection<ListedItem> results = [];
 			try
 			{
 				var token = CancellationToken.None;
 				if (App.LibraryManager.TryGetLibrary(Folder, out var library))
 				{
-					await AddItemsAsyncForLibrary(library, results, token);
+					await AddItemsForLibraryAsync(library, results, token);
 				}
 				else if (Folder == "Home")
 				{
-					await AddItemsAsyncForHome(results, token);
+					await AddItemsForHomeAsync(results, token);
 				}
 				else
 				{
@@ -177,7 +175,7 @@ namespace Files.App.Utils.Storage
 			}
 		}
 
-		private async Task AddItemsAsyncForLibrary(LibraryLocationItem library, IList<ListedItem> results, CancellationToken token)
+		private async Task AddItemsForLibraryAsync(LibraryLocationItem library, IList<ListedItem> results, CancellationToken token)
 		{
 			foreach (var folder in library.Folders)
 			{
@@ -199,15 +197,15 @@ namespace Files.App.Utils.Storage
 			var matches = dbInstance.GetAllUnderPath(folder)
 				.Where(x => tags.All(x.Tags.Contains));
 			if (string.IsNullOrEmpty(folder))
-				matches = matches.Where(x => !RecycleBinHelpers.IsPathUnderRecycleBin(x.FilePath));
+				matches = matches.Where(x => !StorageTrashBinService.IsUnderTrashBin(x.FilePath));
 
 			foreach (var match in matches)
 			{
 				(IntPtr hFile, WIN32_FIND_DATA findData) = await Task.Run(() =>
 				{
-					int additionalFlags = FIND_FIRST_EX_LARGE_FETCH;
-					IntPtr hFileTsk = FindFirstFileExFromApp(match.FilePath, FINDEX_INFO_LEVELS.FindExInfoBasic,
-						out WIN32_FIND_DATA findDataTsk, FINDEX_SEARCH_OPS.FindExSearchNameMatch, IntPtr.Zero, additionalFlags);
+					int additionalFlags = Win32PInvoke.FIND_FIRST_EX_LARGE_FETCH;
+					IntPtr hFileTsk = Win32PInvoke.FindFirstFileExFromApp(match.FilePath, Win32PInvoke.FINDEX_INFO_LEVELS.FindExInfoBasic,
+						out WIN32_FIND_DATA findDataTsk, Win32PInvoke.FINDEX_SEARCH_OPS.FindExSearchNameMatch, IntPtr.Zero, additionalFlags);
 					return (hFileTsk, findDataTsk);
 				}).WithTimeoutAsync(TimeSpan.FromSeconds(5));
 
@@ -231,7 +229,7 @@ namespace Files.App.Utils.Storage
 						}
 					}
 
-					FindClose(hFile);
+					Win32PInvoke.FindClose(hFile);
 				}
 				else
 				{
@@ -287,9 +285,9 @@ namespace Files.App.Utils.Storage
 			//var sampler = new IntervalSampler(500);
 			(IntPtr hFile, WIN32_FIND_DATA findData) = await Task.Run(() =>
 			{
-				int additionalFlags = FIND_FIRST_EX_LARGE_FETCH;
-				IntPtr hFileTsk = FindFirstFileExFromApp($"{folder}\\{QueryWithWildcard}", FINDEX_INFO_LEVELS.FindExInfoBasic,
-					out WIN32_FIND_DATA findDataTsk, FINDEX_SEARCH_OPS.FindExSearchNameMatch, IntPtr.Zero, additionalFlags);
+				int additionalFlags = Win32PInvoke.FIND_FIRST_EX_LARGE_FETCH;
+				IntPtr hFileTsk = Win32PInvoke.FindFirstFileExFromApp($"{folder}\\{QueryWithWildcard}", Win32PInvoke.FINDEX_INFO_LEVELS.FindExInfoBasic,
+					out WIN32_FIND_DATA findDataTsk, Win32PInvoke.FINDEX_SEARCH_OPS.FindExSearchNameMatch, IntPtr.Zero, additionalFlags);
 				return (hFileTsk, findDataTsk);
 			}).WithTimeoutAsync(TimeSpan.FromSeconds(5));
 
@@ -334,10 +332,10 @@ namespace Files.App.Utils.Storage
 							SearchTick?.Invoke(this, EventArgs.Empty);
 						}
 
-						hasNextFile = FindNextFile(hFile, out findData);
+						hasNextFile = Win32PInvoke.FindNextFile(hFile, out findData);
 					} while (hasNextFile);
 
-					FindClose(hFile);
+					Win32PInvoke.FindClose(hFile);
 				});
 			}
 		}
@@ -347,10 +345,14 @@ namespace Files.App.Utils.Storage
 			ListedItem listedItem = null;
 			var isHidden = ((FileAttributes)findData.dwFileAttributes & FileAttributes.Hidden) == FileAttributes.Hidden;
 			var isFolder = ((FileAttributes)findData.dwFileAttributes & FileAttributes.Directory) == FileAttributes.Directory;
+			Win32PInvoke.FileTimeToSystemTime(ref findData.ftLastWriteTime, out Win32PInvoke.SYSTEMTIME systemModifiedTimeOutput);
+			Win32PInvoke.FileTimeToSystemTime(ref findData.ftCreationTime, out Win32PInvoke.SYSTEMTIME systemCreatedTimeOutput);
+
 			if (!isFolder)
 			{
 				string itemFileExtension = null;
 				string itemType = null;
+				long fileSize = Win32FindDataExtensions.GetSize(findData);
 				if (findData.cFileName.Contains('.', StringComparison.Ordinal))
 				{
 					itemFileExtension = Path.GetExtension(itemPath);
@@ -362,11 +364,15 @@ namespace Files.App.Utils.Storage
 					PrimaryItemAttribute = StorageItemTypes.File,
 					ItemNameRaw = findData.cFileName,
 					ItemPath = itemPath,
+					ItemDateModifiedReal = systemModifiedTimeOutput.ToDateTime(),
+					ItemDateCreatedReal = systemCreatedTimeOutput.ToDateTime(),
 					IsHiddenItem = isHidden,
 					LoadFileIcon = false,
 					FileExtension = itemFileExtension,
 					ItemType = itemType,
-					Opacity = isHidden ? Constants.UI.DimItemOpacity : 1
+					Opacity = isHidden ? Constants.UI.DimItemOpacity : 1,
+					FileSize = fileSize.ToSizeString(),
+					FileSizeBytes = fileSize,
 				};
 			}
 			else
@@ -378,26 +384,36 @@ namespace Files.App.Utils.Storage
 						PrimaryItemAttribute = StorageItemTypes.Folder,
 						ItemNameRaw = findData.cFileName,
 						ItemPath = itemPath,
+						ItemDateModifiedReal = systemModifiedTimeOutput.ToDateTime(),
+						ItemDateCreatedReal = systemCreatedTimeOutput.ToDateTime(),
 						IsHiddenItem = isHidden,
 						LoadFileIcon = false,
 						Opacity = isHidden ? Constants.UI.DimItemOpacity : 1
 					};
 				}
 			}
+
 			if (listedItem is not null && MaxItemCount > 0) // Only load icon for searchbox suggestions
 			{
-				_ = FileThumbnailHelper.LoadIconFromPathAsync(listedItem.ItemPath, ThumbnailSize, ThumbnailMode.ListView, isFolder)
+				_ = FileThumbnailHelper.GetIconAsync(
+					listedItem.ItemPath,
+					Constants.ShellIconSizes.Small,
+					isFolder,
+					IconOptions.ReturnIconOnly | IconOptions.UseCurrentScale)
 					.ContinueWith((t) =>
 					{
 						if (t.IsCompletedSuccessfully && t.Result is not null)
 						{
 							_ = FilesystemTasks.Wrap(() => MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(async () =>
 							{
-								listedItem.FileImage = await t.Result.ToBitmapAsync();
+								var bitmapImage = await t.Result.ToBitmapAsync();
+								if (bitmapImage is not null)
+									listedItem.FileImage = bitmapImage;
 							}, Microsoft.UI.Dispatching.DispatcherQueuePriority.Low));
 						}
 					});
 			}
+
 			return listedItem;
 		}
 
@@ -494,15 +510,16 @@ namespace Files.App.Utils.Storage
 			}
 			if (listedItem is not null && MaxItemCount > 0) // Only load icon for searchbox suggestions
 			{
-				var iconData = await FileThumbnailHelper.LoadIconFromStorageItemAsync(item, ThumbnailSize, ThumbnailMode.ListView, ThumbnailOptions.ResizeThumbnail);
-				if (iconData is not null)
-				{
-					listedItem.FileImage = await iconData.ToBitmapAsync();
-				}
+				var iconResult = await FileThumbnailHelper.GetIconAsync(
+					item.Path,
+					Constants.ShellIconSizes.Small,
+					item.IsOfType(StorageItemTypes.Folder),
+					IconOptions.ReturnIconOnly | IconOptions.UseCurrentScale);
+
+				if (iconResult is not null)
+					listedItem.FileImage = await iconResult.ToBitmapAsync();
 				else
-				{
 					listedItem.NeedsPlaceholderGlyph = true;
-				}
 			}
 			return listedItem;
 		}
@@ -515,9 +532,7 @@ namespace Files.App.Utils.Storage
 				UserSearchFilter = AQSQuery ?? string.Empty,
 			};
 
-			query.IndexerOption = SearchUnindexedItems
-				? IndexerOption.DoNotUseIndexer
-				: IndexerOption.OnlyUseIndexerAndOptimizeForIndexedProperties;
+			query.IndexerOption = IndexerOption.UseIndexerWhenAvailable;
 
 			query.SortOrder.Clear();
 			query.SortOrder.Add(new SortEntry { PropertyName = "System.Search.Rank", AscendingOrder = false });

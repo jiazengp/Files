@@ -1,20 +1,22 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Foundation;
 using Windows.Storage;
 using Windows.Storage.FileProperties;
 using Windows.Storage.Search;
+using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace Files.App.Utils.Storage
 {
-	public class ShortcutStorageFolder : ShellStorageFolder, IShortcutStorageItem
+	public sealed class ShortcutStorageFolder : ShellStorageFolder, IShortcutStorageItem
 	{
 		public string TargetPath { get; }
 		public string Arguments { get; }
 		public string WorkingDirectory { get; }
 		public bool RunAsAdmin { get; }
+		public SHOW_WINDOW_CMD ShowWindowCommand { get; set; }
 
 		public ShortcutStorageFolder(ShellLinkItem item) : base(item)
 		{
@@ -22,6 +24,7 @@ namespace Files.App.Utils.Storage
 			Arguments = item.Arguments;
 			WorkingDirectory = item.WorkingDirectory;
 			RunAsAdmin = item.RunAsAdmin;
+			ShowWindowCommand = item.ShowWindowCommand;
 		}
 	}
 
@@ -33,7 +36,7 @@ namespace Files.App.Utils.Storage
 		bool RunAsAdmin { get; }
 	}
 
-	public class BinStorageFolder : ShellStorageFolder, IBinStorageItem
+	public sealed class BinStorageFolder : ShellStorageFolder, IBinStorageItem
 	{
 		public string OriginalPath { get; }
 		public DateTimeOffset DateDeleted { get; }
@@ -108,7 +111,7 @@ namespace Files.App.Utils.Storage
 
 		protected static async Task<(ShellFileItem Folder, List<ShellFileItem> Items)> GetFolderAndItems(string path, bool enumerate, int startIndex = 0, int maxItemsToRetrieve = int.MaxValue)
 		{
-			return await Win32Shell.GetShellFolderAsync(path, enumerate ? "Enumerate" : "Query", startIndex, maxItemsToRetrieve);
+			return await Win32Helper.GetShellFolderAsync(path, !enumerate, enumerate, startIndex, maxItemsToRetrieve);
 		}
 
 		public override IAsyncOperation<StorageFolder> ToStorageFolderAsync() => throw new NotSupportedException();
@@ -231,6 +234,9 @@ namespace Files.App.Utils.Storage
 		public override IAsyncOperation<BaseStorageFolder> CreateFolderAsync(string desiredName, CreationCollisionOption options)
 			=> throw new NotSupportedException();
 
+		public override IAsyncOperation<BaseStorageFolder> MoveAsync(IStorageFolder destinationFolder) => throw new NotSupportedException();
+		public override IAsyncOperation<BaseStorageFolder> MoveAsync(IStorageFolder destinationFolder, NameCollisionOption option) => throw new NotSupportedException();
+
 		public override IAsyncAction RenameAsync(string desiredName) => throw new NotSupportedException();
 		public override IAsyncAction RenameAsync(string desiredName, NameCollisionOption option) => throw new NotSupportedException();
 
@@ -289,7 +295,7 @@ namespace Files.App.Utils.Storage
 			});
 		}
 
-		private class ShellFolderBasicProperties : BaseBasicProperties
+		private sealed class ShellFolderBasicProperties : BaseBasicProperties
 		{
 			private readonly ShellFileItem folder;
 
@@ -297,7 +303,7 @@ namespace Files.App.Utils.Storage
 
 			public override ulong Size => folder.FileSizeBytes;
 
-			public override DateTimeOffset ItemDate => folder.ModifiedDate;
+			public override DateTimeOffset DateCreated => folder.CreatedDate;
 			public override DateTimeOffset DateModified => folder.ModifiedDate;
 		}
 	}

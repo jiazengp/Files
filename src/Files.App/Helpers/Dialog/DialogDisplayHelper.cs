@@ -1,15 +1,12 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Files.App.Dialogs;
-using Files.App.ViewModels.Dialogs;
 using Microsoft.UI.Xaml.Controls;
-using System;
-using System.Threading.Tasks;
 
 namespace Files.App.Helpers
 {
-	internal class DialogDisplayHelper
+	internal sealed class DialogDisplayHelper
 	{
 		/// <summary>
 		/// Standard dialog, to ensure consistency.

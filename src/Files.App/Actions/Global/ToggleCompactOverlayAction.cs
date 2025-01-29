@@ -1,12 +1,12 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Microsoft.UI.Windowing;
 using Windows.Graphics;
 
 namespace Files.App.Actions
 {
-	internal class ToggleCompactOverlayAction : ObservableObject, IToggleAction
+	internal sealed class ToggleCompactOverlayAction : ObservableObject, IToggleAction
 	{
 		private readonly IWindowContext windowContext;
 
@@ -29,7 +29,7 @@ namespace Files.App.Actions
 			windowContext.PropertyChanged += WindowContext_PropertyChanged;
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
 			var appWindow = MainWindow.Instance.AppWindow;
 

@@ -1,33 +1,51 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Microsoft.Win32;
+using System.Security;
 
 namespace Files.App.Helpers
 {
 	internal static class SoftwareHelpers
 	{
+		private const string UninstallRegistryKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall";
+		private const string VsRegistryKey = @"SOFTWARE\Microsoft\VisualStudio";
+
+		private const string VsCodeName = "Microsoft Visual Studio Code";
+
+
 		public static bool IsVSCodeInstalled()
 		{
-			string registryKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall";
-			string vsCodeName = "Microsoft Visual Studio Code";
-
-			return
-				ContainsName(Registry.CurrentUser.OpenSubKey(registryKey), vsCodeName) ||
-				ContainsName(Registry.LocalMachine.OpenSubKey(registryKey), vsCodeName);
+			try
+			{
+				return
+					ContainsName(Registry.CurrentUser.OpenSubKey(UninstallRegistryKey), VsCodeName) ||
+					ContainsName(Registry.LocalMachine.OpenSubKey(UninstallRegistryKey), VsCodeName);
+			}
+			catch (SecurityException)
+			{
+				// Handle edge case where OpenSubKey results in SecurityException
+				return false;
+			}
 		}
 
 		public static bool IsVSInstalled()
 		{
-			string registryKey = @"SOFTWARE\Microsoft\VisualStudio";
+			try
+			{
+				var key = Registry.LocalMachine.OpenSubKey(VsRegistryKey);
+				if (key is null)
+					return false;
 
-			var key = Registry.LocalMachine.OpenSubKey(registryKey);
-			if (key is null)
+				key.Close();
+
+				return true;
+			}
+			catch (SecurityException)
+			{
+				// Handle edge case where OpenSubKey results in SecurityException
 				return false;
-
-			key.Close();
-
-			return true;
+			}
 		}
 
 		private static bool ContainsName(RegistryKey? key, string find)
@@ -35,20 +53,28 @@ namespace Files.App.Helpers
 			if (key is null)
 				return false;
 
-			foreach (var subKey in key.GetSubKeyNames().Select(key.OpenSubKey))
+			try
 			{
-				var displayName = subKey?.GetValue("DisplayName") as string;
-				if (!string.IsNullOrWhiteSpace(displayName) && displayName.StartsWith(find))
+				foreach (var subKey in key.GetSubKeyNames().Select(key.OpenSubKey))
 				{
-					key.Close();
+					var displayName = subKey?.GetValue("DisplayName") as string;
+					if (!string.IsNullOrWhiteSpace(displayName) && displayName.StartsWith(find))
+					{
+						key.Close();
 
-					return true;
+						return true;
+					}
 				}
+
+				key.Close();
+
+				return false;
 			}
-
-			key.Close();
-
-			return false;
+			catch (SecurityException)
+			{
+				// Handle edge case where OpenSubKey results in SecurityException
+				return false;
+			}
 		}
 	}
 }

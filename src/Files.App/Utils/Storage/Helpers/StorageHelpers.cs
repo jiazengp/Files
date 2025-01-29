@@ -1,5 +1,5 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Files.Shared.Helpers;
 using System.Runtime.InteropServices;
@@ -32,7 +32,7 @@ namespace Files.App.Helpers
 			}
 
 			// Fast get attributes
-			bool exists = NativeFileOperationsHelper.GetFileAttributesExFromApp(path, NativeFileOperationsHelper.GET_FILEEX_INFO_LEVELS.GetFileExInfoStandard, out NativeFileOperationsHelper.WIN32_FILE_ATTRIBUTE_DATA itemAttributes);
+			bool exists = Win32PInvoke.GetFileAttributesExFromApp(path, Win32PInvoke.GET_FILEEX_INFO_LEVELS.GetFileExInfoStandard, out Win32PInvoke.WIN32_FILE_ATTRIBUTE_DATA itemAttributes);
 			if (exists) // Exists on local storage
 			{
 				// Directory
@@ -45,7 +45,7 @@ namespace Files.App.Helpers
 					}
 					else // Just get the directory
 					{
-						await GetFolder();
+						await GetFolderAsync();
 					}
 				}
 				else // File
@@ -57,7 +57,7 @@ namespace Files.App.Helpers
 					}
 					else // Just get the file
 					{
-						await GetFile();
+						await GetFileAsync();
 					}
 				}
 			}
@@ -67,27 +67,27 @@ namespace Files.App.Helpers
 
 				if (typeof(IStorageFile).IsAssignableFrom(typeof(TRequested)))
 				{
-					await GetFile();
+					await GetFileAsync();
 				}
 				else if (typeof(IStorageFolder).IsAssignableFrom(typeof(TRequested)))
 				{
-					await GetFolder();
+					await GetFolderAsync();
 				}
 				else if (typeof(IStorageItem).IsAssignableFrom(typeof(TRequested)))
 				{
 					if (System.IO.Path.HasExtension(path)) // Possibly a file
 					{
-						await GetFile();
+						await GetFileAsync();
 					}
 
 					if (!file || file.Result is null) // Possibly a folder
 					{
-						await GetFolder();
+						await GetFolderAsync();
 
 						if (file is null && (!folder || folder.Result is null))
 						{
 							// Try file because it wasn't checked
-							await GetFile();
+							await GetFileAsync();
 						}
 					}
 				}
@@ -106,13 +106,13 @@ namespace Files.App.Helpers
 
 			// Extensions
 
-			async Task GetFile()
+			async Task GetFileAsync()
 			{
 				var rootItem = await FilesystemTasks.Wrap(() => DriveHelpers.GetRootFromPathAsync(path));
 				file = await FilesystemTasks.Wrap(() => StorageFileExtensions.DangerousGetFileFromPathAsync(path, rootItem));
 			}
 
-			async Task GetFolder()
+			async Task GetFolderAsync()
 			{
 				var rootItem = await FilesystemTasks.Wrap(() => DriveHelpers.GetRootFromPathAsync(path));
 				folder = await FilesystemTasks.Wrap(() => StorageFileExtensions.DangerousGetFolderFromPathAsync(path, rootItem));
@@ -160,7 +160,7 @@ namespace Files.App.Helpers
 
 		public static bool Exists(string path)
 		{
-			return NativeFileOperationsHelper.GetFileAttributesExFromApp(path, NativeFileOperationsHelper.GET_FILEEX_INFO_LEVELS.GetFileExInfoStandard, out _);
+			return Win32PInvoke.GetFileAttributesExFromApp(path, Win32PInvoke.GET_FILEEX_INFO_LEVELS.GetFileExInfoStandard, out _);
 		}
 
 		public static IStorageItemWithPath FromStorageItem(this IStorageItem item, string customPath = null, FilesystemItemType? itemType = null)
