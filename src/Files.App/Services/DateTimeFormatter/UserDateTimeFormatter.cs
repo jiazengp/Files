@@ -1,9 +1,9 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Services.DateTimeFormatter
 {
-	internal class UserDateTimeFormatter : IDateTimeFormatter
+	internal sealed class UserDateTimeFormatter : IDateTimeFormatter
 	{
 		public IUserSettingsService UserSettingsService { get; } = Ioc.Default.GetRequiredService<IUserSettingsService>();
 

@@ -1,5 +1,5 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -7,7 +7,7 @@ using System.Windows.Input;
 
 namespace Files.App.Data.Models
 {
-	public class ContextMenuFlyoutItemViewModel
+	public sealed class ContextMenuFlyoutItemViewModel
 	{
 		public bool ShowItem { get; set; } = true;
 
@@ -57,7 +57,7 @@ namespace Files.App.Data.Models
 
 		public bool CollapseLabel { get; set; }
 
-		public OpacityIconModel OpacityIcon { get; set; }
+		public ThemedIconModel ThemedIconModel { get; set; }
 
 		public bool ShowLoadingIndicator { get; set; }
 

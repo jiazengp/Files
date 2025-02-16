@@ -1,5 +1,5 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Windows.Storage;
 
@@ -120,7 +120,7 @@ namespace Files.App.Utils.Storage
 					var model = x.Model;
 					model.ShowCountTextBelow = true;
 					var parentPath = PathNormalization.GetParentDir(first.ItemPath.TrimPath());
-					model.Text = System.IO.Path.GetFileName(parentPath);
+					model.Text = GetFolderName(parentPath);
 					model.Subtext = parentPath;
 				}, null),
 				_ => (null, null)
@@ -157,13 +157,20 @@ namespace Files.App.Utils.Storage
 			return "0";
 		}
 
-		private static readonly (long size, string text, string sizeText)[] sizeGroups = new (long, string, string)[]
-		{
+		private static readonly (long size, string text, string sizeText)[] sizeGroups =
+		[
 			(5000000000, "ItemSizeText_Huge".GetLocalizedResource(), "5 GiB".ConvertSizeAbbreviation()),
 			(1000000000, "ItemSizeText_VeryLarge".GetLocalizedResource(), "1 GiB".ConvertSizeAbbreviation()),
 			(128000000, "ItemSizeText_Large".GetLocalizedResource(), "128 MiB".ConvertSizeAbbreviation()),
 			(1000000, "ItemSizeText_Medium".GetLocalizedResource(), "1 MiB".ConvertSizeAbbreviation()),
 			(16000, "ItemSizeText_Small".GetLocalizedResource(), "16 KiB".ConvertSizeAbbreviation()),
-		};
+		];
+
+		private static string GetFolderName(string path)
+		{
+			if (path == null)
+				return null;
+			return path.Substring(path.LastIndexOf('\\') + 1);
+		}
 	}
 }

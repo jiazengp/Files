@@ -1,6 +1,7 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
+using System;
 using System.IO;
 using Vanara.PInvoke;
 using Vanara.Windows.Shell;
@@ -126,9 +127,10 @@ namespace Files.App.Utils.Shell
 			{
 				IsFolder = !string.IsNullOrEmpty(linkItem.TargetPath) && linkItem.Target.IsFolder,
 				RunAsAdmin = linkItem.RunAsAdministrator,
+				ShowWindowCommand = (Windows.Win32.UI.WindowsAndMessaging.SHOW_WINDOW_CMD)linkItem.ShowState,
 				Arguments = linkItem.Arguments,
-				WorkingDirectory = linkItem.WorkingDirectory,
-				TargetPath = linkItem.TargetPath
+				WorkingDirectory = Environment.ExpandEnvironmentVariables(linkItem.WorkingDirectory),
+				TargetPath = Environment.ExpandEnvironmentVariables(linkItem.TargetPath)
 			};
 
 			return link;

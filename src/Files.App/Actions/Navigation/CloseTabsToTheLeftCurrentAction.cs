@@ -1,9 +1,9 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Actions
 {
-	internal sealed class CloseTabsToTheLeftCurrentAction : CloseTabBaseAction
+	internal sealed partial class CloseTabsToTheLeftCurrentAction : CloseTabBaseAction
 	{
 		public override string Label
 			=> "CloseTabsToTheLeft".GetLocalizedResource();
@@ -15,7 +15,7 @@ namespace Files.App.Actions
 		{
 		}
 
-		public override Task ExecuteAsync()
+		public override Task ExecuteAsync(object? parameter = null)
 		{
 			MultitaskingTabsHelpers.CloseTabsToTheLeft(context.CurrentTabItem, context.Control!);
 

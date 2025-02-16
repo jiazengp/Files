@@ -1,7 +1,5 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
-
-using Files.Shared.Helpers;
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Actions
 {
@@ -17,11 +15,7 @@ namespace Files.App.Actions
 
 		public abstract RichGlyph Glyph { get; }
 
-		public bool IsExecutable =>
-			_context.SelectedItem is not null &&
-			(FileExtensionHelpers.IsExecutableFile(_context.SelectedItem.FileExtension) ||
-			(_context.SelectedItem is ShortcutItem shortcut &&
-			shortcut.IsExecutable));
+		public virtual bool IsExecutable { get; }
 
 		public BaseRunAsAction(string verb)
 		{
@@ -31,7 +25,7 @@ namespace Files.App.Actions
 			_context.PropertyChanged += Context_PropertyChanged;
 		}
 
-		public async Task ExecuteAsync()
+		public async Task ExecuteAsync(object? parameter = null)
 		{
 			await ContextMenu.InvokeVerb(_verb, _context.SelectedItem!.ItemPath);
 		}

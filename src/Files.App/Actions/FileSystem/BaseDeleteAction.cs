@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Windows.Storage;
 
@@ -24,7 +24,7 @@ namespace Files.App.Actions
 			context.PropertyChanged += Context_PropertyChanged;
 		}
 
-		protected async Task DeleteItems(bool permanently)
+		protected async Task DeleteItemsAsync(bool permanently)
 		{
 			var items =
 				context.SelectedItems.Select(item =>
@@ -34,9 +34,11 @@ namespace Files.App.Actions
 							? FilesystemItemType.File
 							: FilesystemItemType.Directory));
 
-			await context.ShellPage!.FilesystemHelpers.DeleteItemsAsync(items, settings.DeleteConfirmationPolicy, permanently, true);
-
-			await context.ShellPage.FilesystemViewModel.ApplyFilesAndFoldersChangesAsync();
+			if (context.ShellPage is IShellPage shellPage)
+			{
+				await shellPage.FilesystemHelpers.DeleteItemsAsync(items, settings.DeleteConfirmationPolicy, permanently, true);
+				await shellPage.ShellViewModel.ApplyFilesAndFoldersChangesAsync();
+			}
 		}
 
 		private void Context_PropertyChanged(object? sender, PropertyChangedEventArgs e)

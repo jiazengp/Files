@@ -1,19 +1,20 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Files.App.Data.Items;
 using Files.App.Helpers;
-using Files.Core.Storage.LocatableStorage;
+using Files.Core.Storage.Storables;
 using Microsoft.Extensions.Logging;
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using Windows.Devices.Enumeration;
 using Windows.Devices.Portable;
 using Windows.Storage;
 
 namespace Files.App.Utils
 {
-	public class WindowsStorageDeviceWatcher : IStorageDeviceWatcher
+	public sealed class WindowsStorageDeviceWatcher : IStorageDeviceWatcher
 	{
 		public event EventHandler<ILocatableFolder> DeviceAdded;
 		public event EventHandler<string> DeviceRemoved;
@@ -88,7 +89,7 @@ namespace Files.App.Utils
 			{
 				root = StorageDevice.FromId(deviceId);
 			}
-			catch (Exception ex) when (ex is ArgumentException or UnauthorizedAccessException)
+			catch (Exception ex) when (ex is ArgumentException or UnauthorizedAccessException or COMException)
 			{
 				App.Logger.LogWarning($"{ex.GetType()}: Attempting to add the device, {args.Name},"
 					+ $" failed at the StorageFolder initialization step. This device will be ignored. Device ID: {deviceId}");

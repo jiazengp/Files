@@ -1,10 +1,14 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Actions
 {
-	internal class PinToStartAction : IAction
+	internal sealed class PinToStartAction : IAction
 	{
+		private IStorageService StorageService { get; } = Ioc.Default.GetRequiredService<IStorageService>();
+
+		private IStartMenuService StartMenuService { get; } = Ioc.Default.GetRequiredService<IStartMenuService>();
+
 		public IContentPageContext context;
 
 		public string Label
@@ -14,23 +18,42 @@ namespace Files.App.Actions
 			=> "PinToStartDescription".GetLocalizedResource();
 
 		public RichGlyph Glyph
-			=> new(opacityStyle: "ColorIconPinToFavorites");
+			=> new(themedIconStyle: "App.ThemedIcons.FavoritePin");
+
+		public bool IsExecutable =>
+			context.ShellPage is not null;
 
 		public PinToStartAction()
 		{
 			context = Ioc.Default.GetRequiredService<IContentPageContext>();
 		}
 
-		public async Task ExecuteAsync()
+		public async Task ExecuteAsync(object? parameter = null)
 		{
-			if (context.SelectedItems.Count > 0)
+			if (context.SelectedItems.Count > 0 && context.ShellPage?.SlimContentPage?.SelectedItems is not null)
 			{
-				foreach (ListedItem listedItem in context.ShellPage?.SlimContentPage.SelectedItems)
-					await App.SecondaryTileHelper.TryPinFolderAsync(listedItem.ItemPath, listedItem.Name);
+				foreach (ListedItem listedItem in context.ShellPage.SlimContentPage.SelectedItems)
+				{
+					await SafetyExtensions.IgnoreExceptions(async () =>
+					{
+						IStorable storable = listedItem.IsFolder switch
+						{
+							true => await StorageService.GetFolderAsync(listedItem.ItemPath),
+							_ => await StorageService.GetFileAsync((listedItem as ShortcutItem)?.TargetPath ?? listedItem.ItemPath)
+						};
+						await StartMenuService.PinAsync(storable, listedItem.Name);
+					});
+				}
 			}
-			else
+			else if (context.ShellPage?.ShellViewModel?.CurrentFolder is not null)
 			{
-				await App.SecondaryTileHelper.TryPinFolderAsync(context.ShellPage?.FilesystemViewModel.CurrentFolder.ItemPath, context.ShellPage?.FilesystemViewModel.CurrentFolder.Name);
+				await SafetyExtensions.IgnoreExceptions(async () =>
+				{
+					var currentFolder = context.ShellPage.ShellViewModel.CurrentFolder;
+					var folder = await StorageService.GetFolderAsync(currentFolder.ItemPath);
+
+					await StartMenuService.PinAsync(folder, currentFolder.Name);
+				});
 			}
 		}
 	}
