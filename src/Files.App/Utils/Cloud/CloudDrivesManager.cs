@@ -1,23 +1,23 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
-using Files.Core.Utils.Cloud;
 using Microsoft.Extensions.Logging;
 using System.Collections.Specialized;
+using System.IO;
 using Windows.Storage;
 
 namespace Files.App.Utils.Cloud
 {
-	public class CloudDrivesManager
+	public static class CloudDrivesManager
 	{
-		private readonly ILogger _logger = Ioc.Default.GetRequiredService<ILogger<App>>();
+		private static readonly ILogger _logger = Ioc.Default.GetRequiredService<ILogger<App>>();
 
-		private readonly ICloudDetector _detector = Ioc.Default.GetRequiredService<ICloudDetector>();
+		private static readonly ICloudDetector _detector = Ioc.Default.GetRequiredService<ICloudDetector>();
 
-		public EventHandler<NotifyCollectionChangedEventArgs> DataChanged;
+		public static EventHandler<NotifyCollectionChangedEventArgs> DataChanged;
 
-		private readonly List<DriveItem> _Drives = new();
-		public IReadOnlyList<DriveItem> Drives
+		private static readonly List<DriveItem> _Drives = [];
+		public static IReadOnlyList<DriveItem> Drives
 		{
 			get
 			{
@@ -28,7 +28,7 @@ namespace Files.App.Utils.Cloud
 			}
 		}
 
-		public async Task UpdateDrivesAsync()
+		public static async Task UpdateDrivesAsync()
 		{
 			var providers = await _detector.DetectCloudProvidersAsync();
 			if (providers is null)
@@ -42,7 +42,7 @@ namespace Files.App.Utils.Cloud
 				{
 					Text = provider.Name,
 					Path = provider.SyncFolder,
-					Type = DriveType.CloudDrive,
+					Type = Data.Items.DriveType.CloudDrive,
 				};
 
 				try
@@ -50,6 +50,14 @@ namespace Files.App.Utils.Cloud
 					cloudProviderItem.Root = await StorageFolder.GetFolderFromPathAsync(cloudProviderItem.Path);
 
 					_ = MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() => cloudProviderItem.UpdatePropertiesAsync());
+				}
+				catch (FileNotFoundException ex)
+				{
+					_logger?.LogInformation(ex, "Failed to find the cloud folder");
+				}
+				catch (UnauthorizedAccessException ex)
+				{
+					_logger?.LogInformation(ex, " Failed to access the cloud folder");
 				}
 				catch (Exception ex)
 				{
@@ -64,7 +72,19 @@ namespace Files.App.Utils.Cloud
 					ShowProperties = true,
 				};
 
-				var iconData = provider.IconData ?? await FileThumbnailHelper.LoadIconWithoutOverlayAsync(provider.SyncFolder, 24);
+				var iconData = provider.IconData;
+
+				if (iconData is null)
+				{
+					var result = await FileThumbnailHelper.GetIconAsync(
+						provider.SyncFolder,
+						Constants.ShellIconSizes.Small,
+						false,
+						IconOptions.ReturnIconOnly | IconOptions.UseCurrentScale);
+
+					iconData = result;
+				}
+
 				if (iconData is not null)
 				{
 					cloudProviderItem.IconData = iconData;

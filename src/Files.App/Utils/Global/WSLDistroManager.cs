@@ -1,5 +1,5 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using System.Collections.Specialized;
 using System.Diagnostics.CodeAnalysis;
@@ -8,12 +8,12 @@ using static Files.App.Constants;
 
 namespace Files.App.Utils
 {
-	public class WSLDistroManager
+	public static class WSLDistroManager
 	{
-		public EventHandler<NotifyCollectionChangedEventArgs> DataChanged;
+		public static EventHandler<NotifyCollectionChangedEventArgs> DataChanged;
 
-		private readonly List<WslDistroItem> distros = new();
-		public IReadOnlyList<WslDistroItem> Distros
+		private static readonly List<WslDistroItem> distros = [];
+		public static IReadOnlyList<WslDistroItem> Distros
 		{
 			get
 			{
@@ -24,10 +24,18 @@ namespace Files.App.Utils
 			}
 		}
 
-		public async Task UpdateDrivesAsync()
+		public static async Task UpdateDrivesAsync()
 		{
 			try
 			{
+				// Check if WSL is installed
+				const string WslRegistryPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Lxss\MSI";
+				using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(WslRegistryPath))
+				{
+					if (key is null || key.GetValue("InstallLocation") is null)
+						return;
+				}
+
 				var distroFolder = await StorageFolder.GetFolderFromPathAsync(@"\\wsl$\");
 				foreach (StorageFolder folder in await distroFolder.GetFoldersAsync())
 				{
@@ -58,7 +66,7 @@ namespace Files.App.Utils
 			}
 		}
 
-		public bool TryGetDistro(string path, [NotNullWhen(true)] out WslDistroItem? distro)
+		public static bool TryGetDistro(string path, [NotNullWhen(true)] out WslDistroItem? distro)
 		{
 			var normalizedPath = PathNormalization.NormalizePath(path);
 			distro = Distros.FirstOrDefault(x => normalizedPath.StartsWith(PathNormalization.NormalizePath(x.Path), StringComparison.OrdinalIgnoreCase));

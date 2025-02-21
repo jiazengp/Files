@@ -33,7 +33,7 @@ namespace Files.App.ViewModels.Properties
 			ViewModel.PropertyChanged += ViewModel_PropertyChanged;
 		}
 
-		public override void GetBaseProperties()
+		public sealed override void GetBaseProperties()
 		{
 			if (List is not null)
 			{
@@ -56,12 +56,26 @@ namespace Files.App.ViewModels.Properties
 			}
 		}
 
-		public override async Task GetSpecialProperties()
+		public override async Task GetSpecialPropertiesAsync()
 		{
 			if (List.All(x => x.PrimaryItemAttribute == StorageItemTypes.File))
-				ViewModel.IsReadOnly = List.All(x => NativeFileOperationsHelper.HasFileAttribute(x.ItemPath, System.IO.FileAttributes.ReadOnly));
+			{
+				var fileAttributesReadOnly = List.Select(x => Win32Helper.HasFileAttribute(x.ItemPath, System.IO.FileAttributes.ReadOnly));
+				if (fileAttributesReadOnly.All(x => x))
+					ViewModel.IsReadOnly = true;
+				else if (!fileAttributesReadOnly.Any(x => x))
+					ViewModel.IsReadOnly = false;
+				else
+					ViewModel.IsReadOnly = null;
+			}
 
-			ViewModel.IsHidden = List.All(x => NativeFileOperationsHelper.HasFileAttribute(x.ItemPath, System.IO.FileAttributes.Hidden));
+			var fileAttributesHidden = List.Select(x => Win32Helper.HasFileAttribute(x.ItemPath, System.IO.FileAttributes.Hidden));
+			if (fileAttributesHidden.All(x => x))
+				ViewModel.IsHidden = true;
+			else if (!fileAttributesHidden.Any(x => x))
+				ViewModel.IsHidden = false;
+			else
+				ViewModel.IsHidden = null;
 
 			ViewModel.LastSeparatorVisibility = false;
 			ViewModel.ItemSizeVisibility = true;
@@ -73,8 +87,9 @@ namespace Files.App.ViewModels.Properties
 			long filesSize = List.Where(x => x.PrimaryItemAttribute == StorageItemTypes.File).Sum(x => x.FileSizeBytes);
 			long foldersSize = 0;
 			long totalSizeOnDisk = 0;
-			long filesSizeOnDisk = List.Where(x => x.PrimaryItemAttribute == StorageItemTypes.File)
-				.Sum(x => NativeFileOperationsHelper.GetFileSizeOnDisk(x.ItemPath) ?? 0);
+			long filesSizeOnDisk = List.Where(x => x.PrimaryItemAttribute == StorageItemTypes.File &&
+				x.SyncStatusUI.SyncStatus is not CloudDriveSyncStatus.FileOnline and not CloudDriveSyncStatus.FolderOnline)
+					.Sum(x => Win32Helper.GetFileSizeOnDisk(x.ItemPath) ?? 0);
 			long foldersSizeOnDisk = 0;
 
 			ViewModel.ItemSizeProgressVisibility = true;
@@ -84,12 +99,12 @@ namespace Files.App.ViewModels.Properties
 			{
 				if (item.PrimaryItemAttribute == StorageItemTypes.Folder)
 				{
-					var fileSizeTask = Task.Run(async () =>
-					{
-						var size = await CalculateFolderSizeAsync(item.ItemPath, TokenSource.Token);
+					if (item.SyncStatusUI.SyncStatus is CloudDriveSyncStatus.FileOnline or
+						CloudDriveSyncStatus.FolderOnline or
+						CloudDriveSyncStatus.FolderOfflinePartial)
+						continue;
 
-						return size;
-					});
+					var fileSizeTask = Task.Run(() => CalculateFolderSizeAsync(item.ItemPath, TokenSource.Token));
 
 					try
 					{
@@ -121,32 +136,47 @@ namespace Files.App.ViewModels.Properties
 			{
 				case "IsReadOnly":
 					{
-						if (ViewModel.IsReadOnly)
+						if (ViewModel.IsReadOnly is not null)
 						{
-							List.ForEach(x => NativeFileOperationsHelper.SetFileAttribute(
-								x.ItemPath, System.IO.FileAttributes.ReadOnly));
-						}
-						else
-						{
-							List.ForEach(x => NativeFileOperationsHelper.UnsetFileAttribute(
-								x.ItemPath, System.IO.FileAttributes.ReadOnly));
+							if ((bool)ViewModel.IsReadOnly)
+							{
+								List.ForEach(x => Win32Helper.SetFileAttribute(
+									x.ItemPath, System.IO.FileAttributes.ReadOnly));
+							}
+							else
+							{
+								List.ForEach(x => Win32Helper.UnsetFileAttribute(
+									x.ItemPath, System.IO.FileAttributes.ReadOnly));
+							}
 						}
 					}
 					break;
 
 				case "IsHidden":
 					{
-						if (ViewModel.IsHidden)
+						if (ViewModel.IsHidden is not null)
 						{
-							List.ForEach(x => NativeFileOperationsHelper.SetFileAttribute(
-								x.ItemPath, System.IO.FileAttributes.Hidden));
-						}
-						else
-						{
-							List.ForEach(x => NativeFileOperationsHelper.UnsetFileAttribute(
-								x.ItemPath, System.IO.FileAttributes.Hidden));
+							if ((bool)ViewModel.IsHidden)
+							{
+								List.ForEach(x => Win32Helper.SetFileAttribute(
+									x.ItemPath, System.IO.FileAttributes.Hidden));
+							}
+							else
+							{
+								List.ForEach(x => Win32Helper.UnsetFileAttribute(
+									x.ItemPath, System.IO.FileAttributes.Hidden));
+							}
 						}
 
+					}
+					break;
+
+				case "IsContentCompressed":
+					{
+						List.ForEach(x =>
+						{
+							Win32Helper.SetCompressionAttributeIoctl(x.ItemPath, ViewModel.IsContentCompressed ?? false);
+						});
 					}
 					break;
 			}

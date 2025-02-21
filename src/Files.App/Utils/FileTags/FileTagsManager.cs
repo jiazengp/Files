@@ -1,19 +1,19 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Microsoft.Extensions.Logging;
 using System.Collections.Specialized;
 
 namespace Files.App.Utils.FileTags
 {
-	public class FileTagsManager
+	public sealed class FileTagsManager
 	{
 		private readonly ILogger logger = Ioc.Default.GetRequiredService<ILogger<App>>();
 		private readonly IFileTagsSettingsService fileTagsSettingsService = Ioc.Default.GetService<IFileTagsSettingsService>();
 
 		public EventHandler<NotifyCollectionChangedEventArgs> DataChanged;
 
-		private readonly List<FileTagItem> fileTags = new();
+		private readonly List<FileTagItem> fileTags = [];
 		public IReadOnlyList<FileTagItem> FileTags
 		{
 			get
@@ -27,10 +27,10 @@ namespace Files.App.Utils.FileTags
 
 		public FileTagsManager()
 		{
-			fileTagsSettingsService.OnTagsUpdated += TagsUpdated;
+			fileTagsSettingsService.OnTagsUpdated += TagsUpdatedAsync;
 		}
 
-		private async void TagsUpdated(object? _, EventArgs e)
+		private async void TagsUpdatedAsync(object? _, EventArgs e)
 		{
 			lock (fileTags)
 				fileTags.Clear();

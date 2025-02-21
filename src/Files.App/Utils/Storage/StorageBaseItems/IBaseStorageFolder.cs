@@ -1,5 +1,5 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using System.IO;
 using Windows.Foundation;
@@ -46,6 +46,9 @@ namespace Files.App.Utils.Storage
 		new IAsyncOperation<BaseStorageFolder> CreateFolderAsync(string desiredName);
 
 		new IAsyncOperation<BaseStorageFolder> CreateFolderAsync(string desiredName, CreationCollisionOption options);
+
+		IAsyncOperation<BaseStorageFolder> MoveAsync(IStorageFolder destinationFolder);
+		IAsyncOperation<BaseStorageFolder> MoveAsync(IStorageFolder destinationFolder, NameCollisionOption option);
 
 		new BaseStorageItemQueryResult CreateItemQueryWithOptions(QueryOptions queryOptions);
 

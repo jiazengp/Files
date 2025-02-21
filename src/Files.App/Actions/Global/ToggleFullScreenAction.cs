@@ -1,11 +1,11 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Microsoft.UI.Windowing;
 
 namespace Files.App.Actions
 {
-	internal class ToggleFullScreenAction : IToggleAction
+	internal sealed class ToggleFullScreenAction : IToggleAction
 	{
 		public string Label
 			=> "FullScreen".GetLocalizedResource();
@@ -25,7 +25,7 @@ namespace Files.App.Actions
 			}
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
 			var appWindow = MainWindow.Instance.AppWindow;
 			var newKind = appWindow.Presenter.Kind is AppWindowPresenterKind.FullScreen

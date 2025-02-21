@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Windows.Graphics.Imaging;
 
@@ -9,7 +9,7 @@ namespace Files.App.Actions
 	{
 		private readonly IContentPageContext context;
 
-		private readonly PreviewPaneViewModel _previewPaneViewModel;
+		private readonly InfoPaneViewModel _infoPaneViewModel;
 
 		public abstract string Label { get; }
 
@@ -21,24 +21,23 @@ namespace Files.App.Actions
 
 		public bool IsExecutable =>
 			IsContextPageTypeAdaptedToCommand() &&
-			(context.ShellPage?.SlimContentPage?.SelectedItemsPropertiesViewModel?.IsSelectedItemImage ?? false);
+			(context.ShellPage?.SlimContentPage?.SelectedItemsPropertiesViewModel?.IsCompatibleToSetAsWindowsWallpaper ?? false);
 
 		public BaseRotateAction()
 		{
 			context = Ioc.Default.GetRequiredService<IContentPageContext>();
-			_previewPaneViewModel = Ioc.Default.GetRequiredService<PreviewPaneViewModel>();
+			_infoPaneViewModel = Ioc.Default.GetRequiredService<InfoPaneViewModel>();
 
 			context.PropertyChanged += Context_PropertyChanged;
 		}
 
-		public async Task ExecuteAsync()
+		public async Task ExecuteAsync(object? parameter = null)
 		{
-			foreach (var image in context.SelectedItems)
-				await BitmapHelper.Rotate(PathNormalization.NormalizePath(image.ItemPath), Rotation);
+			await Task.WhenAll(context.SelectedItems.Select(image => BitmapHelper.RotateAsync(PathNormalization.NormalizePath(image.ItemPath), Rotation)));
 
 			context.ShellPage?.SlimContentPage?.ItemManipulationModel?.RefreshItemsThumbnail();
 
-			await _previewPaneViewModel.UpdateSelectedItemPreview();
+			await _infoPaneViewModel.UpdateSelectedItemPreviewAsync();
 		}
 
 		private bool IsContextPageTypeAdaptedToCommand()

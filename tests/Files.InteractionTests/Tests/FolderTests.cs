@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using OpenQA.Selenium;
 using OpenQA.Selenium.Interactions;
@@ -8,7 +8,7 @@ using System.Threading;
 namespace Files.InteractionTests.Tests
 {
 	[TestClass]
-	public class FolderTests
+	public sealed class FolderTests
 	{
 
 		[TestCleanup]

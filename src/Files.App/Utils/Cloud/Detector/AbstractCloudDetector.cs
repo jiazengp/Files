@@ -1,7 +1,7 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
-using Files.Core.Utils.Cloud;
+using Files.App.Utils.Cloud;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 

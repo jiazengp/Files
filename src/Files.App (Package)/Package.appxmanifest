@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<!--  Copyright (c) 2023 Files Community. Licensed under the MIT License. See the LICENSE.  -->
+<!--  Copyright (c) Files Community. Licensed under the MIT License.  -->
 <Package
     xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
     xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
@@ -16,7 +16,7 @@
     <Identity
         Name="FilesDev"
         Publisher="CN=Files"
-        Version="2.5.24.0" />
+        Version="3.9.1.0" />
 
     <Properties>
         <DisplayName>Files - Dev</DisplayName>
@@ -33,16 +33,17 @@
         <Resource Language="en-US" />
         <Resource Language="af" />
         <Resource Language="ar" />
+        <Resource Language="be-BY" />
         <Resource Language="bg" />
         <Resource Language="ca" />
         <Resource Language="cs-CZ" />
         <Resource Language="da" />
-        <Resource Language="da-DK" />
         <Resource Language="de-DE" />
         <Resource Language="el" />
         <Resource Language="en-GB" />
         <Resource Language="es-ES" />
         <Resource Language="es-419" />
+        <Resource Language="fa-IR" />
         <Resource Language="fi-FI" />
         <Resource Language="fil-PH" />
         <Resource Language="fr-FR" />
@@ -54,18 +55,21 @@
         <Resource Language="it-IT" />
         <Resource Language="ja-JP" />
         <Resource Language="ka" />
+        <Resource Language="km-KH" />
         <Resource Language="ko-KR" />
-        <Resource Language="lt" />
-        <Resource Language="lv-LV" />
+        <Resource Language="lt-LT" />
+        <Resource Language="lv-LV" />        
+        <Resource Language="ms-MY" />
         <Resource Language="nb-NO" />
         <Resource Language="nl-NL" />
-        <Resource Language="or-IN" />
         <Resource Language="pl-PL" />
         <Resource Language="pt-BR" />
         <Resource Language="pt-PT" />
         <Resource Language="ro-RO" />
         <Resource Language="ru-RU" />
-        <Resource Language="sk-SK" />             
+        <Resource Language="sk-SK" />
+        <Resource Language="sq-AL" />
+        <Resource Language="sr-Cyrl" />
         <Resource Language="sv-SE" />
         <Resource Language="ta" />
         <Resource Language="th-TH" />
@@ -94,7 +98,7 @@
                     Wide310x150Logo="Assets\AppTiles\Dev\Wide310x150Logo.png"
                     Square71x71Logo="Assets\AppTiles\Dev\Small71x71Logo.png"
                     Square310x310Logo="Assets\AppTiles\Dev\Large310x310Logo.png"
-                    ShortName="Files">
+                    ShortName="Files - Dev">
                     <uap:ShowNameOnTiles>
                         <uap:ShowOn Tile="square150x150Logo" />
                         <uap:ShowOn Tile="wide310x150Logo" />
@@ -115,12 +119,14 @@
                 </uap3:Extension>
 
                 <uap:Extension Category="windows.protocol">
-                    <uap:Protocol ReturnResults="none" Name="files-uwp" />
+                    <!--  This value changes based on the build branch by CI (files-stable, files-preview, files-dev).  -->
+                    <uap:Protocol ReturnResults="none" Name="files-dev" />
                 </uap:Extension>
 
                 <uap5:Extension Category="windows.appExecutionAlias">
                     <uap5:AppExecutionAlias>
-                        <uap5:ExecutionAlias Alias="files.exe" />
+                        <!--  This value changes based on the build branch by CI (files-stable, files-preview, files-dev).  -->
+                        <uap5:ExecutionAlias Alias="files-dev.exe" />
                     </uap5:AppExecutionAlias>
                 </uap5:Extension>
 
@@ -140,7 +146,11 @@
                             <uap:FileType>.7z</uap:FileType>
                             <uap:FileType>.rar</uap:FileType>
                             <uap:FileType>.tar</uap:FileType>
+                            <uap:FileType>.jar</uap:FileType>
+                            <uap:FileType>.mrpack</uap:FileType>
+                            <uap:FileType>.gz</uap:FileType>
                         </uap:SupportedFileTypes>
+                        <uap:Logo>assets\archives\ExtensionIcon.png</uap:Logo>
                     </uap:FileTypeAssociation>
                 </uap:Extension>
 
@@ -149,13 +159,20 @@
         </Application>
     </Applications>
 
-    <!-- To Host The Background Task Component, This Activatable Class Entry Must Be Added. -->
+    <!-- To host The background task component, this activatable class entry must be added. -->
     <Extensions>
         <Extension Category="windows.activatableClass.inProcessServer">
             <InProcessServer>
                 <Path>Files.App\WinRT.Host.dll</Path>
                 <ActivatableClass ActivatableClassId="Files.App.BackgroundTasks.UpdateTask" ThreadingModel="both" />
             </InProcessServer>
+        </Extension>
+        <Extension Category="windows.activatableClass.outOfProcessServer">
+            <OutOfProcessServer ServerName="Files.App.Server" uap5:IdentityType="activateAsPackage" uap5:RunFullTrust="true">
+                <Path>Files.App.Server\Files.App.Server.exe</Path>
+                <Instancing>singleInstance</Instancing>
+                <ActivatableClass ActivatableClassId="Files.App.Server.AppInstanceMonitor" />
+            </OutOfProcessServer>
         </Extension>
     </Extensions>
   

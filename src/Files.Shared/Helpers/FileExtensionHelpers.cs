@@ -1,5 +1,5 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using System;
 using System.Linq;
@@ -32,7 +32,37 @@ namespace Files.Shared.Helpers
 		/// <returns><c>true</c> if the fileExtensionToCheck is an image; otherwise, <c>false</c>.</returns>
 		public static bool IsImageFile(string? fileExtensionToCheck)
 		{
-			return HasExtension(fileExtensionToCheck, ".png", ".bmp", ".jpg", ".jpeg", ".gif", ".tiff", ".tif");
+			return HasExtension(fileExtensionToCheck, ".png", ".bmp", ".jpg", ".jpeg", ".jfif", ".gif", ".tiff", ".tif", ".webp", ".jxr");
+		}
+
+		/// <summary>
+		/// Checks if the file can be set as wallpaper.
+		/// </summary>
+		/// <param name="fileExtensionToCheck">The file extension to check.</param>
+		/// <returns><c>true</c> if the fileExtensionToCheck is an image; otherwise, <c>false</c>.</returns>
+		public static bool IsCompatibleToSetAsWindowsWallpaper(string? fileExtensionToCheck)
+		{
+			return HasExtension(fileExtensionToCheck, ".png", ".bmp", ".jpg", ".jpeg", ".jfif", ".gif", ".tiff", ".tif", ".jxr");
+		}
+
+		/// <summary>
+		/// Check if the file extension is an audio file.
+		/// </summary>
+		/// <param name="fileExtensionToCheck">The file extension to check.</param>
+		/// <returns><c>true</c> if the fileExtensionToCheck is an audio file; otherwise, <c>false</c>.</returns>
+		public static bool IsAudioFile(string? fileExtensionToCheck)
+		{
+			return HasExtension(fileExtensionToCheck, ".mp3", ".m4a", ".wav", ".wma", ".aac", ".adt", ".adts", ".cda", ".flac");
+		}
+		
+		/// <summary>
+		/// Check if the file extension is a video file.
+		/// </summary>
+		/// <param name="fileExtensionToCheck">The file extension to check.</param>
+		/// <returns><c>true</c> if the fileExtensionToCheck is a video file; otherwise, <c>false</c>.</returns>
+		public static bool IsVideoFile(string? fileExtensionToCheck)
+		{
+			return HasExtension(fileExtensionToCheck, ".mp4", ".webm", ".ogg", ".mov", ".qt", ".m4v", ".mp4v", ".3g2", ".3gp2", ".3gp", ".3gpp", ".mkv");
 		}
 
 		/// <summary>
@@ -46,13 +76,23 @@ namespace Files.Shared.Helpers
 		}
 
 		/// <summary>
+		/// Check if the file extension is a Batch file.
+		/// </summary>
+		/// <param name="fileExtensionToCheck">The file extension to check.</param>
+		/// <returns><c>true</c> if the fileExtensionToCheck is a Batch file; otherwise, <c>false</c>.</returns>
+		public static bool IsBatchFile(string fileExtensionToCheck)
+		{
+			return HasExtension(fileExtensionToCheck, ".bat");
+		}
+
+		/// <summary>
 		/// Check if the file extension is a zip file.
 		/// </summary>
 		/// <param name="fileExtensionToCheck">The file extension to check.</param>
 		/// <returns><c>true</c> if the fileExtensionToCheck is a zip bundle file; otherwise, <c>false</c>.</returns>
 		public static bool IsZipFile(string? fileExtensionToCheck)
 		{
-			return HasExtension(fileExtensionToCheck, ".zip", ".msix", ".appx", ".msixbundle", ".7z", ".rar", ".tar");
+			return HasExtension(fileExtensionToCheck, ".zip", ".msix", ".appx", ".msixbundle", ".appxbundle", ".7z", ".rar", ".tar", ".mcpack", ".mcworld", ".mrpack", ".jar", ".gz", ".lzh");
 		}
 
 		public static bool IsBrowsableZipFile(string? filePath, out string? ext)
@@ -65,7 +105,7 @@ namespace Files.Shared.Helpers
 			}
 
 			// Only extensions we want to browse
-			ext = new[] { ".zip", ".7z", ".rar", ".tar"}
+			ext = new[] { ".zip", ".7z", ".rar", ".tar", ".gz", ".lzh", ".mrpack", ".jar" }
 				.FirstOrDefault(x => filePath.Contains(x, StringComparison.OrdinalIgnoreCase));
 
 			return ext is not null;
@@ -130,7 +170,27 @@ namespace Files.Shared.Helpers
 			return
 				exeOnly
 					? HasExtension(filePathToCheck, ".exe")
-					: HasExtension(filePathToCheck, ".exe", ".bat", ".cmd");
+					: HasExtension(filePathToCheck, ".exe", ".bat", ".cmd", ".ahk");
+		}
+
+		/// <summary>
+		/// Check if the file path is an Auto Hot Key file.
+		/// </summary>
+		/// <param name="filePathToCheck">The file path to check.</param>
+		/// <returns><c>true</c> if the filePathToCheck is an Auto Hot Key file; otherwise, <c>false</c>.</returns>
+		public static bool IsAhkFile(string? filePathToCheck)
+		{
+			return HasExtension(filePathToCheck, ".ahk");
+		}
+
+		/// <summary>
+		/// Check if the file path is a cmd file.
+		/// </summary>
+		/// <param name="filePathToCheck">The file path to check.</param>
+		/// <returns><c>true</c> if the filePathToCheck is a cmd file; otherwise, <c>false</c>.</returns>
+		public static bool IsCmdFile(string? filePathToCheck)
+		{
+			return HasExtension(filePathToCheck, ".cmd");
 		}
 
 		/// <summary>
@@ -153,6 +213,17 @@ namespace Files.Shared.Helpers
 		{
 			return HasExtension(fileExtensionToCheck, ".vhd", ".vhdx");
 		}
+		
+		/// <summary>
+		/// Check if the file extension is a screen saver file.
+		/// </summary>
+		/// <param name="fileExtensionToCheck">The file extension to check.</param>
+		/// <returns><c>true</c> if the fileExtensionToCheck is a screen saver file; otherwise, <c>false</c>.</returns>
+		/// <remarks>Screen saver file types are; scr</remarks>
+		public static bool IsScreenSaverFile(string? fileExtensionToCheck)
+		{
+			return HasExtension(fileExtensionToCheck, ".scr");
+		}
 
 		/// <summary>
 		/// Check if the file extension is a media (audio/video) file.
@@ -163,7 +234,7 @@ namespace Files.Shared.Helpers
 		{
 			return HasExtension(
 				filePathToCheck, ".mp4", ".m4v", ".mp4v", ".3g2", ".3gp2", ".3gp", ".3gpp",
-				".mpg", ".mp2", ".mpeg", ".mpe", ".mpv", ".ogg", ".avi", ".wmv", ".mov", ".qt");
+				".mpg", ".mp2", ".mpeg", ".mpe", ".mpv", ".mkv", ".ogg", ".avi", ".wmv", ".mov", ".qt");
 		}
 
 		/// <summary>
@@ -175,5 +246,26 @@ namespace Files.Shared.Helpers
 		{
 			return HasExtension(filePathToCheck, ".cer", ".crt", ".der", ".pfx");
 		}
+
+		/// <summary>
+		/// Check if the file extension is a Script file.
+		/// </summary>
+		/// <param name="filePathToCheck"></param>
+		/// <returns><c>true</c> if the filePathToCheck is a script file; otherwise, <c>false</c>.</returns>
+		public static bool IsScriptFile(string? filePathToCheck)
+		{
+			return HasExtension(filePathToCheck, ".py", ".ahk");
+		}
+		
+		/// <summary>
+		/// Check if the file extension is a system file.
+		/// </summary>
+		/// <param name="filePathToCheck"></param>
+		/// <returns><c>true</c> if the filePathToCheck is a system file; otherwise, <c>false</c>.</returns>
+		public static bool IsSystemFile(string? filePathToCheck)
+		{
+			return HasExtension(filePathToCheck, ".dll", ".exe", ".sys", ".inf");
+		}
+
 	}
 }

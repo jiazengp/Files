@@ -1,9 +1,9 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Actions
 {
-	internal sealed class CloseOtherTabsCurrentAction : CloseTabBaseAction
+	internal sealed partial class CloseOtherTabsCurrentAction : CloseTabBaseAction
 	{
 		public override string Label
 			=> "CloseOtherTabs".GetLocalizedResource();
@@ -15,7 +15,7 @@ namespace Files.App.Actions
 		{
 		}
 
-		public override Task ExecuteAsync()
+		public override Task ExecuteAsync(object? parameter = null)
 		{
 			if (context.Control is not null)
 				MultitaskingTabsHelpers.CloseOtherTabs(context.CurrentTabItem, context.Control);
