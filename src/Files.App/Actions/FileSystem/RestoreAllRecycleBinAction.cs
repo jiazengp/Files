@@ -1,26 +1,62 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
+
+using Microsoft.UI.Xaml.Controls;
+using Windows.Foundation.Metadata;
 
 namespace Files.App.Actions
 {
-	internal class RestoreAllRecycleBinAction : BaseUIAction, IAction
+	internal sealed partial class RestoreAllRecycleBinAction : BaseUIAction, IAction
 	{
+		private readonly IStorageTrashBinService StorageTrashBinService = Ioc.Default.GetRequiredService<IStorageTrashBinService>();
+
 		public string Label
-			=> "RestoreAllItems".GetLocalizedResource();
+			=> Strings.RestoreAllItems.GetLocalizedResource();
 
 		public string Description
-			=> "RestoreAllRecycleBinDescription".GetLocalizedResource();
+			=> Strings.RestoreAllRecycleBinDescription.GetLocalizedResource();
 
 		public RichGlyph Glyph
-			=> new(opacityStyle: "ColorIconRestoreItem");
+			=> new(themedIconStyle: "App.ThemedIcons.RestoreDeleted");
 
 		public override bool IsExecutable =>
 			UIHelpers.CanShowDialog &&
-			RecycleBinHelpers.RecycleBinHasItems();
+			StorageTrashBinService.HasItems();
 
-		public async Task ExecuteAsync()
+		public async Task ExecuteAsync(object? parameter = null)
 		{
-			await RecycleBinHelpers.RestoreRecycleBin();
+			// TODO: Use AppDialogService
+			var confirmationDialog = new ContentDialog()
+			{
+				Title = Strings.ConfirmRestoreBinDialogTitle.GetLocalizedResource(),
+				Content = Strings.ConfirmRestoreBinDialogContent.GetLocalizedResource(),
+				PrimaryButtonText = Strings.Yes.GetLocalizedResource(),
+				SecondaryButtonText = Strings.Cancel.GetLocalizedResource(),
+				DefaultButton = ContentDialogButton.Primary
+			};
+
+			if (ApiInformation.IsApiContractPresent("Windows.Foundation.UniversalApiContract", 8))
+				confirmationDialog.XamlRoot = MainWindow.Instance.Content.XamlRoot;
+
+			if (await confirmationDialog.TryShowAsync() is not ContentDialogResult.Primary)
+				return;
+
+			bool result = await StorageTrashBinService.RestoreAllTrashesAsync();
+
+			// Show error dialog when failed
+			if (!result)
+			{
+				var errorDialog = new ContentDialog()
+				{
+					Title = Strings.FailedToRestore.GetLocalizedResource(),
+					PrimaryButtonText = Strings.OK.GetLocalizedResource(),
+				};
+
+				if (ApiInformation.IsApiContractPresent("Windows.Foundation.UniversalApiContract", 8))
+					errorDialog.XamlRoot = MainWindow.Instance.Content.XamlRoot;
+
+				await errorDialog.TryShowAsync();
+			}
 		}
 	}
 }

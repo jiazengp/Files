@@ -1,5 +1,5 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using System.IO;
 using System.Runtime.InteropServices.WindowsRuntime;
@@ -12,7 +12,7 @@ using IO = System.IO;
 
 namespace Files.App.Utils.Storage
 {
-	public sealed class SystemStorageFile : BaseStorageFile
+	public sealed partial class SystemStorageFile : BaseStorageFile
 	{
 		public StorageFile File { get; }
 
@@ -48,7 +48,7 @@ namespace Files.App.Utils.Storage
 
 		public override IAsyncOperation<BaseBasicProperties> GetBasicPropertiesAsync()
 			=> AsyncInfo.Run<BaseBasicProperties>(async (cancellationToken)
-				=> new SystemFileBasicProperties(await File.GetBasicPropertiesAsync())
+				=> new SystemFileBasicProperties(await File.GetBasicPropertiesAsync(), DateCreated)
 			);
 
 		public override IAsyncOperation<BaseStorageFile> CopyAsync(IStorageFolder destinationFolder)
@@ -69,40 +69,40 @@ namespace Files.App.Utils.Storage
 					}
 					else if (destFolder is ICreateFileWithStream cwsf)
 					{
-						using var inStream = await this.OpenStreamForReadAsync();
+						await using var inStream = await this.OpenStreamForReadAsync();
 						return await cwsf.CreateFileAsync(inStream, desiredNewName, option.Convert());
 					}
 					else
 					{
 						var destFile = await destFolder.CreateFileAsync(desiredNewName, option.Convert());
-						using (var inStream = await this.OpenStreamForReadAsync())
-						using (var outStream = await destFile.OpenStreamForWriteAsync())
+						await using (var inStream = await this.OpenStreamForReadAsync())
+						await using (var outStream = await destFile.OpenStreamForWriteAsync())
 						{
-							await inStream.CopyToAsync(outStream);
-							await outStream.FlushAsync();
+							await inStream.CopyToAsync(outStream, cancellationToken);
+							await outStream.FlushAsync(cancellationToken);
 						}
 						return destFile;
 					}
 				}
-				catch (UnauthorizedAccessException ex) // shortcuts & .url
+				catch (UnauthorizedAccessException) // shortcuts & .url
 				{
 					if (!string.IsNullOrEmpty(destFolder.Path))
 					{
 						var destination = IO.Path.Combine(destFolder.Path, desiredNewName);
-						var hFile = NativeFileOperationsHelper.CreateFileForWrite(destination,
+						var hFile = Win32Helper.CreateFileForWrite(destination,
 							option == NameCollisionOption.ReplaceExisting);
 						if (!hFile.IsInvalid)
 						{
-							using (var inStream = await this.OpenStreamForReadAsync())
-							using (var outStream = new FileStream(hFile, FileAccess.Write))
+							await using (var inStream = await this.OpenStreamForReadAsync())
+							await using (var outStream = new FileStream(hFile, FileAccess.Write))
 							{
-								await inStream.CopyToAsync(outStream);
-								await outStream.FlushAsync();
+								await inStream.CopyToAsync(outStream, cancellationToken);
+								await outStream.FlushAsync(cancellationToken);
 							}
 							return new NativeStorageFile(destination, desiredNewName, DateTime.Now);
 						}
 					}
-					throw ex;
+					throw;
 				}
 			});
 		}
@@ -140,22 +140,22 @@ namespace Files.App.Utils.Storage
 		{
 			return AsyncInfo.Run(async (cancellationToken) =>
 			{
-				using var inStream = await this.OpenStreamForReadAsync();
-				using var outStream = await fileToReplace.OpenStreamForWriteAsync();
+				await using var inStream = await this.OpenStreamForReadAsync();
+				await using var outStream = await fileToReplace.OpenStreamForWriteAsync();
 
-				await inStream.CopyToAsync(outStream);
-				await outStream.FlushAsync();
+				await inStream.CopyToAsync(outStream, cancellationToken);
+				await outStream.FlushAsync(cancellationToken);
 			});
 		}
 		public override IAsyncAction MoveAndReplaceAsync(IStorageFile fileToReplace)
 		{
 			return AsyncInfo.Run(async (cancellationToken) =>
 			{
-				using var inStream = await this.OpenStreamForReadAsync();
-				using var outStream = await fileToReplace.OpenStreamForWriteAsync();
+				await using var inStream = await this.OpenStreamForReadAsync();
+				await using var outStream = await fileToReplace.OpenStreamForWriteAsync();
 
-				await inStream.CopyToAsync(outStream);
-				await outStream.FlushAsync();
+				await inStream.CopyToAsync(outStream, cancellationToken);
+				await outStream.FlushAsync(cancellationToken);
 				// Move unsupported, copy but do not delete original
 			});
 		}
@@ -173,16 +173,21 @@ namespace Files.App.Utils.Storage
 		public override IAsyncOperation<StorageItemThumbnail> GetThumbnailAsync(ThumbnailMode mode, uint requestedSize, ThumbnailOptions options)
 			=> File.GetThumbnailAsync(mode, requestedSize, options);
 
-		private class SystemFileBasicProperties : BaseBasicProperties
+		private sealed partial class SystemFileBasicProperties : BaseBasicProperties
 		{
 			private readonly IStorageItemExtraProperties basicProps;
+			private readonly DateTimeOffset? dateCreated;
 
 			public override ulong Size => (basicProps as BasicProperties)?.Size ?? 0;
 
-			public override DateTimeOffset ItemDate => (basicProps as BasicProperties)?.ItemDate ?? DateTimeOffset.Now;
+			public override DateTimeOffset DateCreated => dateCreated ?? DateTimeOffset.Now;
 			public override DateTimeOffset DateModified => (basicProps as BasicProperties)?.DateModified ?? DateTimeOffset.Now;
 
-			public SystemFileBasicProperties(IStorageItemExtraProperties basicProps) => this.basicProps = basicProps;
+			public SystemFileBasicProperties(IStorageItemExtraProperties basicProps, DateTimeOffset dateCreated)
+			{
+				this.basicProps = basicProps;
+				this.dateCreated = dateCreated;
+			}
 
 			public override IAsyncOperation<IDictionary<string, object>> RetrievePropertiesAsync(IEnumerable<string> propertiesToRetrieve)
 				=> basicProps.RetrievePropertiesAsync(propertiesToRetrieve);

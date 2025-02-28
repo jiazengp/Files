@@ -1,17 +1,17 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Actions
 {
-	internal class CreateShortcutFromDialogAction : BaseUIAction, IAction
+	internal sealed partial class CreateShortcutFromDialogAction : BaseUIAction, IAction
 	{
 		private readonly IContentPageContext context;
 
 		public string Label
-			=> "Shortcut".GetLocalizedResource();
+			=> Strings.Shortcut.GetLocalizedResource();
 
 		public string Description
-			=> "CreateShortcutFromDialogDescription".GetLocalizedResource();
+			=> Strings.CreateShortcutFromDialogDescription.GetLocalizedResource();
 
 		public RichGlyph Glyph
 			=> new("\uE71B");
@@ -27,7 +27,7 @@ namespace Files.App.Actions
 			context.PropertyChanged += Context_PropertyChanged;
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
 			return UIFilesystemHelpers.CreateShortcutFromDialogAsync(context.ShellPage!);
 		}

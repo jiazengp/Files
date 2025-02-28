@@ -1,17 +1,20 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Actions
 {
-	internal class CreateFolderAction : BaseUIAction, IAction
+	internal sealed partial class CreateFolderAction : BaseUIAction, IAction
 	{
 		private readonly IContentPageContext context;
 
 		public string Label
-			=> "Folder".GetLocalizedResource();
+			=> Strings.Folder.GetLocalizedResource();
 
 		public string Description
-			=> "CreateFolderDescription".GetLocalizedResource();
+			=> Strings.CreateFolderDescription.GetLocalizedResource();
+
+		public HotKey HotKey
+			=> new(Keys.N, KeyModifiers.CtrlShift);
 
 		public RichGlyph Glyph
 			=> new(baseGlyph: "\uE8B7");
@@ -27,10 +30,10 @@ namespace Files.App.Actions
 			context.PropertyChanged += Context_PropertyChanged;
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
 			if (context.ShellPage is not null)
-				UIFilesystemHelpers.CreateFileFromDialogResultType(AddItemDialogItemType.Folder, null!, context.ShellPage);
+				UIFilesystemHelpers.CreateFileFromDialogResultTypeAsync(AddItemDialogItemType.Folder, null!, context.ShellPage);
 
 			return Task.CompletedTask;
 		}

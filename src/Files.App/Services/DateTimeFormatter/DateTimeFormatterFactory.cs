@@ -1,11 +1,11 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using System;
 
 namespace Files.App.Services.DateTimeFormatter
 {
-	public class DateTimeFormatterFactory : IDateTimeFormatterFactory
+	public sealed class DateTimeFormatterFactory : IDateTimeFormatterFactory
 	{
 		public IDateTimeFormatter GetDateTimeFormatter(DateTimeFormats dateTimeFormat) => dateTimeFormat switch
 		{

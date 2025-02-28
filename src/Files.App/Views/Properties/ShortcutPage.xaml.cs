@@ -1,12 +1,7 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
-using CommunityToolkit.WinUI;
-using Files.App.Extensions;
-using Files.App.Utils;
-using Files.App.Helpers;
 using Files.App.ViewModels.Properties;
-using System.Threading.Tasks;
 
 namespace Files.App.Views.Properties
 {
@@ -29,12 +24,19 @@ namespace Files.App.Views.Properties
 			if (shortcutItem is null)
 				return true;
 
+			ViewModel.RunAsAdmin = ViewModel.RunAsAdminEditedValue;
+			ViewModel.ShortcutItemPath = ViewModel.ShortcutItemPathEditedValue;
+			ViewModel.ShortcutItemWorkingDir = ViewModel.ShortcutItemWorkingDirEditedValue;
+			ViewModel.ShortcutItemArguments = ViewModel.ShortcutItemArgumentsEditedValue;
+			ViewModel.ShowWindowCommand = ViewModel.ShowWindowCommandEditedValue;
+
 			await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() =>
 				UIFilesystemHelpers.UpdateShortcutItemProperties(shortcutItem,
 				ViewModel.ShortcutItemPath,
 				ViewModel.ShortcutItemArguments,
 				ViewModel.ShortcutItemWorkingDir,
-				ViewModel.RunAsAdmin)
+				ViewModel.RunAsAdmin,
+				ViewModel.ShowWindowCommand)
 			);
 
 			return true;

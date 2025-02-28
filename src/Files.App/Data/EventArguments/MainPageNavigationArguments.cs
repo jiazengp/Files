@@ -1,9 +1,9 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Data.EventArguments
 {
-	internal class MainPageNavigationArguments
+	internal sealed class MainPageNavigationArguments
 	{
 		public object? Parameter { get; set; }
 

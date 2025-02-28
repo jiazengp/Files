@@ -1,23 +1,25 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 namespace Files.App.Actions
 {
-	internal class CreateFolderWithSelectionAction : ObservableObject, IAction
+	internal sealed partial class CreateFolderWithSelectionAction : ObservableObject, IAction
 	{
 		private readonly IContentPageContext context;
 
 		public string Label
-			=> "CreateFolderWithSelection".GetLocalizedResource();
+			=> Strings.CreateFolderWithSelection.GetLocalizedResource();
 
 		public string Description
-			=> "CreateFolderWithSelectionDescription".GetLocalizedResource();
+			=> Strings.CreateFolderWithSelectionDescription.GetLocalizedResource();
 
 		public RichGlyph Glyph
-			=> new(opacityStyle: "ColorIconNewFolder");
+			=> new(themedIconStyle: "App.ThemedIcons.New.Folder");
 
 		public bool IsExecutable =>
 			context.ShellPage is not null &&
+			context.PageType != ContentPageTypes.RecycleBin &&
+			context.PageType != ContentPageTypes.ZipFolder &&
 			context.HasSelection;
 
 		public CreateFolderWithSelectionAction()
@@ -27,7 +29,7 @@ namespace Files.App.Actions
 			context.PropertyChanged += Context_PropertyChanged;
 		}
 
-		public Task ExecuteAsync()
+		public Task ExecuteAsync(object? parameter = null)
 		{
 			return UIFilesystemHelpers.CreateFolderWithSelectionAsync(context.ShellPage!);
 		}

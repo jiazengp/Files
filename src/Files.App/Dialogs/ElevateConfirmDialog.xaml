@@ -1,4 +1,4 @@
-﻿<!--  Copyright (c) 2023 Files Community. Licensed under the MIT License. See the LICENSE.  -->
+﻿<!--  Copyright (c) Files Community. Licensed under the MIT License.  -->
 <ContentDialog
 	x:Class="Files.App.Dialogs.ElevateConfirmDialog"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -12,8 +12,9 @@
 	Content="{helpers:ResourceString Name=ElevateConfirmDialog/Content}"
 	CornerRadius="{StaticResource OverlayCornerRadius}"
 	DefaultButton="None"
+	HighContrastAdjustment="None"
 	PrimaryButtonText="{helpers:ResourceString Name=Yes}"
-	RequestedTheme="{x:Bind helpers:ThemeHelper.RootTheme}"
+	RequestedTheme="{x:Bind RootAppElement.RequestedTheme, Mode=OneWay}"
 	Style="{StaticResource DefaultContentDialogStyle}"
 	mc:Ignorable="d">
 
@@ -21,10 +22,10 @@
 		<Style BasedOn="{StaticResource AccentButtonStyle}" TargetType="Button">
 			<Setter Property="ContentTemplate">
 				<Setter.Value>
-					<DataTemplate x:DataType="ContentDialog">
+					<DataTemplate>
 						<StackPanel Orientation="Horizontal" Spacing="5">
 							<FontIcon FontSize="14" Glyph="&#xEA18;" />
-							<TextBlock Text="{x:Bind PrimaryButtonText, Mode=OneWay}" />
+							<TextBlock Text="{Binding Content, RelativeSource={RelativeSource Mode=TemplatedParent}}" />
 						</StackPanel>
 					</DataTemplate>
 				</Setter.Value>

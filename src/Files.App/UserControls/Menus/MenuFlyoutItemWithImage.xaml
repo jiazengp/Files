@@ -1,4 +1,4 @@
-﻿<!--  Copyright (c) 2023 Files Community. Licensed under the MIT License. See the LICENSE.  -->
+﻿<!--  Copyright (c) Files Community. Licensed under the MIT License.  -->
 <MenuFlyoutItem
 	x:Class="Files.App.UserControls.MenuFlyoutItemWithImage"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -8,12 +8,14 @@
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 	d:DesignHeight="300"
 	d:DesignWidth="400"
+	HighContrastAdjustment="None"
 	mc:Ignorable="d">
 
 	<MenuFlyoutItem.Style>
 		<Style TargetType="local:MenuFlyoutItemWithImage">
 			<Setter Property="Padding" Value="{ThemeResource MenuFlyoutItemThemePadding}" />
 			<Setter Property="FontSize" Value="{ThemeResource ControlContentThemeFontSize}" />
+			<Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
 			<Setter Property="Template">
 				<Setter.Value>
 					<ControlTemplate TargetType="local:MenuFlyoutItemWithImage">
@@ -25,7 +27,7 @@
 							Background="{TemplateBinding Background}"
 							BorderBrush="{TemplateBinding BorderBrush}"
 							BorderThickness="{TemplateBinding BorderThickness}"
-							CornerRadius="{TemplateBinding CornerRadius}">
+							CornerRadius="{StaticResource ControlCornerRadius}">
 							<Grid.ColumnDefinitions>
 								<ColumnDefinition Width="*" />
 								<ColumnDefinition Width="Auto" />

@@ -1,12 +1,12 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using Files.App.Extensions;
 using System;
 
 namespace Files.App.Services.DateTimeFormatter
 {
-	internal class SystemDateTimeFormatter : AbstractDateTimeFormatter
+	internal sealed class SystemDateTimeFormatter : AbstractDateTimeFormatter
 	{
 		public override string Name
 			=> "SystemTimeStyle".GetLocalizedResource();

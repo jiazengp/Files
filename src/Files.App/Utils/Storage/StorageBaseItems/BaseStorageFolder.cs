@@ -1,5 +1,5 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Foundation;
@@ -183,6 +183,10 @@ namespace Files.App.Utils.Storage
 				AsyncInfo.Run(async (cancellationToken)
 					=> await (await CreateFolderAsync(desiredName, options)).ToStorageFolderAsync());
 		}
+
+		public abstract IAsyncOperation<BaseStorageFolder> MoveAsync(IStorageFolder destinationFolder);
+
+		public abstract IAsyncOperation<BaseStorageFolder> MoveAsync(IStorageFolder destinationFolder, NameCollisionOption option);
 
 		public abstract IAsyncAction RenameAsync(string desiredName);
 

@@ -1,7 +1,7 @@
-﻿// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
 
-using Files.Core.Storage.LocatableStorage;
+using Files.Core.Storage.Storables;
 using System.Threading;
 using System.Threading.Tasks;
 

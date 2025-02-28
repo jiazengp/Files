@@ -1,5 +1,5 @@
-// Copyright (c) 2023 Files Community
-// Licensed under the MIT License. See the LICENSE.
+// Copyright (c) Files Community
+// Licensed under the MIT License.
 
 using System.Collections.Immutable;
 using System.IO;
@@ -96,7 +96,7 @@ namespace Files.App.Utils.Storage
 
 		public static List<PathBoxItem> GetDirectoryPathComponents(string value)
 		{
-			List<PathBoxItem> pathBoxItems = new();
+			List<PathBoxItem> pathBoxItems = [];
 
 			if (value.Contains('/', StringComparison.Ordinal))
 			{
@@ -126,6 +126,26 @@ namespace Files.App.Utils.Storage
 						pathBoxItems.Add(GetPathItem(component, path));
 
 					lastIndex = i + 1;
+				}
+			}
+
+			return pathBoxItems;
+		}
+
+		public static async Task<List<PathBoxItem>> GetDirectoryPathComponentsWithDisplayNameAsync(string value)
+		{
+			var pathBoxItems = GetDirectoryPathComponents(value);
+
+			foreach (var item in pathBoxItems)
+			{
+				if (item.Path == "Home")
+					item.Title = "Home".GetLocalizedResource();
+				else
+				{
+					BaseStorageFolder folder = await FilesystemTasks.Wrap(() => DangerousGetFolderFromPathAsync(item.Path));
+
+					if (!string.IsNullOrEmpty(folder?.DisplayName))
+						item.Title = folder.DisplayName;
 				}
 			}
 
@@ -275,14 +295,13 @@ namespace Files.App.Utils.Storage
 			}
 			else if (component.StartsWith(Constants.UserEnvironmentPaths.NetworkFolderPath, StringComparison.Ordinal))
 			{
-				title = "SidebarNetworkDrives".GetLocalizedResource();
+				title = "Network".GetLocalizedResource();
 			}
-			else if (component.Contains(':', StringComparison.Ordinal))
+			else if (component.EndsWith(':'))
 			{
 				var drivesViewModel = Ioc.Default.GetRequiredService<DrivesViewModel>();
-				var networkDrivesViewModel = Ioc.Default.GetRequiredService<NetworkDrivesViewModel>();
 
-				var drives = drivesViewModel.Drives.Concat(networkDrivesViewModel.Drives).Cast<DriveItem>().Concat(App.CloudDrivesManager.Drives);
+				var drives = drivesViewModel.Drives.Cast<DriveItem>();
 				var drive = drives.FirstOrDefault(y => y.ItemType is NavigationControlItemType.Drive && y.Path.Contains(component, StringComparison.OrdinalIgnoreCase));
 				title = drive is not null ? drive.Text : string.Format("DriveWithLetter".GetLocalizedResource(), component);
 			}
@@ -303,7 +322,7 @@ namespace Files.App.Utils.Storage
 
 		private static string GetPathWithoutEnvironmentVariable(string path)
 		{
-			if (path.StartsWith("~\\", StringComparison.Ordinal))
+			if (path.StartsWith("~\\", StringComparison.Ordinal) || path.StartsWith("~/", StringComparison.Ordinal) || path.Equals("~", StringComparison.Ordinal))
 				path = $"{Constants.UserEnvironmentPaths.HomePath}{path.Remove(0, 1)}";
 
 			path = path.Replace("%temp%", Constants.UserEnvironmentPaths.TempPath, StringComparison.OrdinalIgnoreCase);
@@ -397,7 +416,7 @@ namespace Files.App.Utils.Storage
 			var subPath = path.ToString().Substring(substringIndex);
 
 			path.Clear();
-			path.Append(context.ShellPage?.FilesystemViewModel.WorkingDirectory);
+			path.Append(context.ShellPage?.ShellViewModel.WorkingDirectory);
 			path.Append(separator);
 			path.Append(subPath);
 			i = -1;
