@@ -526,7 +526,10 @@ namespace Files.App.Views.Layouts
 					];
 
 					ItemManipulationModel.SetSelectedItems(listedItemsToSelect);
-					ItemManipulationModel.FocusSelectedItems();
+
+					// Don't focus file list if TextBox is focused
+					if (FocusManager.GetFocusedElement() is not TextBox)
+						ItemManipulationModel.FocusSelectedItems();
 				}
 				else if (navigationArguments is not null && ParentShellPageInstance!.InstanceViewModel.FolderSettings.LayoutMode is not FolderLayoutModes.ColumnView)
 				{
@@ -535,7 +538,9 @@ namespace Files.App.Views.Layouts
 						await Task.Delay(100);
 
 					// Focus on the active pane in case it was lost during navigation
-					ParentShellPageInstance!.PaneHolder.FocusActivePane();
+					// Don't focus file list if TextBox is focused
+					if (FocusManager.GetFocusedElement() is not TextBox)
+						ParentShellPageInstance!.PaneHolder.FocusActivePane();
 				}
 			}
 			catch (Exception) { }
